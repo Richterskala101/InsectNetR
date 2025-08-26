@@ -17,8 +17,7 @@ Imports:
     stringr,
     dplyr,
     reshape2,
-    tidyr,
-    InsectNetR
+    tidyr
 Suggests:
     ggplot2,
     testthat (>= 3.0.0),
