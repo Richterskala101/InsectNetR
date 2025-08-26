@@ -10,19 +10,21 @@ Description: Apply spatio-temporal plausibility checks of predictions, Compute 1
 License: MIT + file LICENSE
 Depends: R (>= 4.1)
 Imports:
-  data.table (>= 1.14.0),
-  lubridate,
-  stats,
-  utils,
-  stringr,
-  dplyr,
-  reshape2,
-  tidyr
+    data.table (>= 1.14.0),
+    lubridate,
+    stats,
+    utils,
+    stringr,
+    dplyr,
+    reshape2,
+    tidyr,
+    InsectNetR
 Suggests:
-  ggplot2, 
-  testthat, 
-  knitr, 
-  rmarkdown
+    ggplot2,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
+Config/testthat/edition: 3
