@@ -4,7 +4,7 @@
 \alias{parse_datetime}
 \title{Parse datetime from filename (YYYYMMDD_HHMMSS or similar)}
 \usage{
-parse_datetime(df, filename_col = "filename")
+parse_datetime(filenames)
 }
 \arguments{
 \item{filename}{A character, ususaly the name of the file, including the date and time of recording}
@@ -19,7 +19,7 @@ Parse datetime from filename (YYYYMMDD_HHMMSS or similar)
 }
 \examples{
 # example code
-predictions <- data.frame(filename = c("path/to/20240719_112000.WAV", "another/path/20240722_124000.WAV"))
+predictions <- filename = c("path/to/20240719_112000.WAV", "another/path/20240722_124000.WAV")
 datetimes <- parse_datetime(predictions)
 print(datetimes)
 

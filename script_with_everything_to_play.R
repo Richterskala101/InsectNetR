@@ -37,15 +37,16 @@ parse_datetime <- function(filename, tz = "UTC") {
 #' @return data.table with columns filename, offset, species, conf, timestamp, Plot_ID
 #' @export
 reshape_predictions <- function(df, tz = "UTC") {
-  dt <- data.table::as.data.table(df)
-  long <- melt(dt, id.vars = c("filename", "offset"),
-               variable.name = "species", value.name = "conf")
-  # derive timestamp
-  long[, timestamp := parse_filename_datetime(filename, tz = tz) +
-         as.numeric(sub("-.*", "", offset))]
-  # derive Plot_ID (site/recorder from filename prefix)
-  long[, Plot_ID := tstrsplit(filename, "_")[[1]]]
-  long
+  df %>%
+    tidyr::pivot_longer(
+      cols = -c(filename, offset, prediction, output),
+      names_to = "species",
+      values_to = "conf"
+    ) %>%
+    dplyr::mutate(
+      timestamp = parse_datetime(filename) + readr::parse_number(offset),
+      Plot_ID = stringr::str_split(filename, "_", simplify = TRUE)[,1]
+    )
 }
 
 
@@ -57,7 +58,7 @@ reshape_predictions <- function(df, tz = "UTC") {
 #' @param tz time zone for time-of-day checks
 #' @return original data with logical flag columns
 #' @export
-flag_plausibility <- function(dets, species_info, tz = "UTC") {
+check_spatio_tomporal_plausibility <- function(dets, species_info, tz = "UTC") {
   dt <- data.table::as.data.table(dets)
   si <- data.table::as.data.table(species_info)
   dt[, date := lubridate::as_date(timestamp, tz = tz)]

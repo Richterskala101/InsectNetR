@@ -6,11 +6,11 @@
 #'
 #' @examples
 #' # example code
-#' predictions <- data.frame(filename = c("path/to/20240719_112000.WAV", "another/path/20240722_124000.WAV"))
+#' predictions <- filename = c("path/to/20240719_112000.WAV", "another/path/20240722_124000.WAV")
 #' datetimes <- parse_datetime(predictions)
 #' print(datetimes)
 #'
 
-parse_datetime <- function(df, filename_col = "filename") {
-  lubridate::ymd_hms(basename(df[[filename_col]]))
+parse_datetime <- function(filenames) {
+  lubridate::ymd_hms(basename(filenames))
 }
