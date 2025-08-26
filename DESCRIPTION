@@ -16,6 +16,7 @@ Imports:
   utils,
   stringr,
   dplyr,
+  reshape2,
   tidyr
 Suggests:
   ggplot2, 
