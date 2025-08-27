@@ -2,20 +2,18 @@
 % Please edit documentation in R/parse_datetime.R
 \name{parse_datetime}
 \alias{parse_datetime}
-\title{Parse datetime from filename (YYYYMMDD_HHMMSS or similar)}
+\title{Parse datetime from filenames (YYYYMMDD_HHMMSS or similar)}
 \usage{
 parse_datetime(filenames)
 }
 \arguments{
-\item{filename}{A character, ususaly the name of the file, including the date and time of recording}
-
-\item{tz}{time zone (default "UTC")}
+\item{filenames}{A character, ususaly the name of the file, including the date and time of recording}
 }
 \value{
 a POSIXct object/string
 }
 \description{
-Parse datetime from filename (YYYYMMDD_HHMMSS or similar)
+Parse datetime from filenames (YYYYMMDD_HHMMSS or similar)
 }
 \examples{
 # example code

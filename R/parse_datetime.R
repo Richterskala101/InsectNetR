@@ -1,6 +1,5 @@
-#' Parse datetime from filename (YYYYMMDD_HHMMSS or similar)
-#' @param filename A character, ususaly the name of the file, including the date and time of recording
-#' @param tz time zone (default "UTC")
+#' Parse datetime from filenames (YYYYMMDD_HHMMSS or similar)
+#' @param filenames A character, ususaly the name of the file, including the date and time of recording
 #' @return a POSIXct object/string
 #' @export
 #'
