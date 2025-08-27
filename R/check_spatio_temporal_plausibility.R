@@ -7,72 +7,12 @@
 #' @param tz time zone for time-of-day checks
 #'
 #' @return original data with logical flag columns: season, time_of_day, range, and plausibility_score (sum of flags)
-#' @examples
-#' library(lubridate)
-#' library(sf)
-#'
-#' # Example predictions
-#' predictions <- data.frame(
-#'   species = c("speciesA", "speciesB"),
-#'   timestamp = ymd_hms(c("2024-07-19 11:20:00", "2024-07-22 12:40:00"), tz = "UTC"),
-#'   plot_id = c("plot1", "plot2")
-#' )
-#'
-#' # Temporal species info
-#' species_info_temporal <- data.frame(
-#'   species = c("speciesA", "speciesB"),
-#'   start_date = c("06-01", "07-01"),
-#'   end_date   = c("08-31", "08-31"),
-#'   start_hour = c(6, 8),
-#'   end_hour   = c(20, 18)
-#' )
-#'
-#' # Plot info with point coordinates
-#' plot_info <- data.frame(
-#'   plot_id = c("plot1", "plot2"),
-#'   lat = c(50.25, 51.25),
-#'   lon = c(10.25, 11.25)
-#' )
-#'
-#' # Spatial ranges as polygons
-#' polyA <- st_polygon(list(matrix(c(
-#'   9.0, 49.0,
-#'   9.0, 51.0,
-#'   11.0, 51.0,
-#'   11.0, 49.0,
-#'   9.0, 49.0
-#' ), ncol = 2, byrow = TRUE)))
-#'
-#' polyB <- st_polygon(list(matrix(c(
-#'   10.0, 50.0,
-#'   10.0, 52.0,
-#'   12.0, 52.0,
-#'   12.0, 50.0,
-#'   10.0, 50.0
-#' ), ncol = 2, byrow = TRUE)))
-#'
-#' species_ranges <- st_sf(
-#'   species = c("speciesA", "speciesB"),
-#'   geometry = st_sfc(list(polyA, polyB), crs = 4326)
-#' )
-#'
-#' # Run plausibility check
-#' result <- check_spatio_temporal_plausibility(
-#'   predictions, species_info_temporal, species_ranges, plot_info, tz = "UTC"
-#' )
-#'
-#' print(result[, c("species", "season", "time_of_day", "range", "plausibility_score")])
-#'
 #' @export
 check_spatio_temporal_plausibility <- function(predictions,
                                                species_info_temporal,
                                                species_ranges,
                                                plot_info,
                                                tz = "UTC") {
-  # Required packages
-  requireNamespace("data.table", quietly = TRUE)
-  requireNamespace("lubridate", quietly = TRUE)
-  requireNamespace("sf", quietly = TRUE)
 
   # Convert to data.table
   dt <- data.table::as.data.table(predictions)
@@ -89,8 +29,8 @@ check_spatio_temporal_plausibility <- function(predictions,
   dt$hour <- as.integer(lubridate::hour(lubridate::with_tz(dt$timestamp, tzone = tz)))
 
   # Merge temporal info + plot info
-  dt <- merge(dt, si, by = "species", all.x = TRUE)
-  dt <- merge(dt, pi, by = "plot_id", all.x = TRUE)
+  dt <- data.table::merge.data.table(dt, si, by = "species", all.x = TRUE)
+  dt <- data.table::merge.data.table(dt, pi, by = "plot_id", all.x = TRUE)
 
   # --- Temporal plausibility ---
   dt$season <- mapply(function(d, sd, ed) {
@@ -106,7 +46,7 @@ check_spatio_temporal_plausibility <- function(predictions,
   dt$time_of_day <- dt$hour >= dt$start_hour & dt$hour <= dt$end_hour
 
   # --- Spatial plausibility ---
-  # Disable spherical geometry (use planar for bounding boxes)
+  # Disable spherical geometry (planar for bounding boxes)
   old_s2 <- sf::sf_use_s2(FALSE)
   on.exit(sf::sf_use_s2(old_s2), add = TRUE)  # restore original setting
 

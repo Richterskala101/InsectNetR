@@ -1,11 +1,10 @@
 test_that("check_spatio_temporal_plausibility() returns correct flags", {
-  library(lubridate)
-  library(sf)
+
 
   # Predictions
   predictions <- data.frame(
     species = c("speciesA", "speciesB"),
-    timestamp = ymd_hms(c("2024-07-19 11:20:00", "2024-07-22 12:40:00"), tz = "UTC"),
+    timestamp = lubridate::ymd_hms(c("2024-07-19 11:20:00", "2024-07-22 12:40:00"), tz = "UTC"),
     plot_id = c("plot1", "plot2")
   )
 
@@ -26,7 +25,7 @@ test_that("check_spatio_temporal_plausibility() returns correct flags", {
   )
 
   # Spatial ranges as polygons
-  polyA <- st_polygon(list(matrix(c(
+  polyA <- sf::st_polygon(list(matrix(c(
     9.0, 49.0,
     9.0, 51.0,
     11.0, 51.0,
@@ -34,7 +33,7 @@ test_that("check_spatio_temporal_plausibility() returns correct flags", {
     9.0, 49.0
   ), ncol = 2, byrow = TRUE)))
 
-  polyB <- st_polygon(list(matrix(c(
+  polyB <- sf::st_polygon(list(matrix(c(
     10.0, 50.0,
     10.0, 52.0,
     12.0, 52.0,
@@ -42,9 +41,9 @@ test_that("check_spatio_temporal_plausibility() returns correct flags", {
     10.0, 50.0
   ), ncol = 2, byrow = TRUE)))
 
-  species_ranges <- st_sf(
+  species_ranges <- sf::st_sf(
     species = c("speciesA", "speciesB"),
-    geometry = st_sfc(list(polyA, polyB), crs = 4326)
+    geometry = sf::st_sfc(list(polyA, polyB), crs = 4326)
   )
 
   # Run function

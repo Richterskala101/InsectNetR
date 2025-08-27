@@ -17,8 +17,8 @@ Parse datetime from filenames (YYYYMMDD_HHMMSS or similar)
 }
 \examples{
 # example code
-predictions <- filename = c("path/to/20240719_112000.WAV", "another/path/20240722_124000.WAV")
-datetimes <- parse_datetime(predictions)
+filenames = c("path/to/20240719_112000.WAV", "another/path/20240722_124000.WAV")
+datetimes <- parse_datetime(filenames)
 print(datetimes)
 
 }
