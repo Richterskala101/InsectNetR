@@ -1,3 +1,15 @@
+library(openxlsx)
+confusable_species <- read.xlsx("C:/Users/darend/Downloads/Heuschrecken Verwechslungen Matrix.xlsx") |>
+  dplyr::mutate(Verwechslung.1 = ifelse(Verwechslung.1 == "x", NA, Verwechslung.1)) |>
+  dplyr::rename(species = Art,
+         confusion_species_1 = Verwechslung.1,
+         confusion_species_2 = Verwechslung.2,
+         confusion_species_3 = Verwechslung.3)
+
+usethis::use_data(confusable_species, compress = "xz")
+
+
+
 ' Parse datetime from filename (YYYYMMDD_HHMMSS or similar)
 #' @param filename character
 #' @param tz time zone (default "UTC")
