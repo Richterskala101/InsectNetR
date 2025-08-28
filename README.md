@@ -6,7 +6,8 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of InsectNetR is to …
+The goal of InsectNetR is to give usefull helper functions to preprocess
+predctions of InsectNet.
 
 ## Installation
 
@@ -23,7 +24,7 @@ devtools::install_github("Richterskala101/InsectNetR")
 This is a basic example which shows you how to solve a common problem:
 
 ``` r
-library(InsectNetR)
+#library(InsectNetR)
 ## basic example code
 ```
 

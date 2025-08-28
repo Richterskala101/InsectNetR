@@ -3,3 +3,4 @@
 export(check_spatio_temporal_plausibility)
 export(parse_datetime)
 export(reshape_predictions)
+export(run_shiny_app)

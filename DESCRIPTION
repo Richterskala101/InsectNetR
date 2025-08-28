@@ -16,7 +16,12 @@ Imports:
     tidyr,
     data.table,
     sf,
-    readr
+    readr,
+    shiny,
+    shinyFiles,
+    tuneR,
+    seewave,
+    fs
 Suggests:
     ggplot2,
     testthat (>= 3.0.0),
@@ -27,4 +32,3 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
 Config/testthat/edition: 3
 LazyData: true
-LazyDataCompression: true
