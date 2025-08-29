@@ -5,12 +5,40 @@
 \alias{predictions}
 \title{Exemplary predictions of Orthoptera on audio recordings}
 \format{
-A data frame with 137968 rows and 34 columns:
+A data frame with 137968 rows and 31 columns:
 \describe{
-\item{country}{Country name}
-\item{iso2, iso3}{2 & 3 letter ISO country codes}
-\item{year}{Year}
-...
+\item{filename}{Relative file path to the original WAV audio recording (character).}
+\item{offset}{Time segment of the audio file used for prediction, formatted as \code{"start-end"} in seconds (character).}
+\item{Bicolorana.bicolor}{Probability that the segment contains a stridulation of \emph{Bicolorana bicolor} (numeric).}
+\item{Chorthippus.albomarginatus}{Probability of \emph{Chorthippus albomarginatus}.}
+\item{Chorthippus.apricarius}{Probability of \emph{Chorthippus apricarius}.}
+\item{Chorthippus.biguttulus}{Probability of \emph{Chorthippus biguttulus}.}
+\item{Chorthippus.brunneus}{Probability of \emph{Chorthippus brunneus}.}
+\item{Chorthippus.dorsatus}{Probability of \emph{Chorthippus dorsatus}.}
+\item{Chorthippus.mollis}{Probability of \emph{Chorthippus mollis}.}
+\item{Chrysochraon.dispar}{Probability of \emph{Chrysochraon dispar}.}
+\item{Conocephalus.dorsalis}{Probability of \emph{Conocephalus dorsalis}.}
+\item{Conocephalus.fuscus}{Probability of \emph{Conocephalus fuscus}.}
+\item{Euthystira.brachyptera}{Probability of \emph{Euthystira brachyptera}.}
+\item{Gomphocerippus.rufus}{Probability of \emph{Gomphocerippus rufus}.}
+\item{Gryllotalpa.gryllotalpa}{Probability of \emph{Gryllotalpa gryllotalpa}.}
+\item{Gryllus.campestris}{Probability of \emph{Gryllus campestris}.}
+\item{Isophya.kraussii}{Probability of \emph{Isophya kraussii}.}
+\item{Leptophyes.punctatissima}{Probability of \emph{Leptophyes punctatissima}.}
+\item{Nemobius.sylvestris}{Probability of \emph{Nemobius sylvestris}.}
+\item{Omocestus.viridulus}{Probability of \emph{Omocestus viridulus}.}
+\item{Phaneroptera.falcata}{Probability of \emph{Phaneroptera falcata}.}
+\item{Pholidoptera.griseoaptera}{Probability of \emph{Pholidoptera griseoaptera}.}
+\item{Platycleis.albopunctata}{Probability of \emph{Platycleis albopunctata}.}
+\item{Pseudochorthippus.montanus}{Probability of \emph{Pseudochorthippus montanus}.}
+\item{Pseudochorthippus.parallelus}{Probability of \emph{Pseudochorthippus parallelus}.}
+\item{Roeseliana.roeselii}{Probability of \emph{Roeseliana roeselii}.}
+\item{Ruspolia.nitidula}{Probability of \emph{Ruspolia nitidula}.}
+\item{Stenobothrus.lineatus}{Probability of \emph{Stenobothrus lineatus}.}
+\item{Stethophyma.grossum}{Probability of \emph{Stethophyma grossum}.}
+\item{Tettigonia.cantans}{Probability of \emph{Tettigonia cantans}.}
+\item{Tettigonia.viridissima}{Probability of \emph{Tettigonia viridissima}.}
+\item{nocall.empty}{Probability that the segment contains no relevant call (background noise, silence, or unidentifiable signal).}
 }
 }
 \usage{
@@ -18,5 +46,12 @@ predictions
 }
 \description{
 Exemplary predictions of Orthoptera on audio recordings
+}
+\examples{
+# load the data
+data(predictions)
+# View the first few rows
+head(predictions)
+
 }
 \keyword{datasets}

@@ -28,6 +28,8 @@ classification model predicts incorrectly or with low confidence. The columns
 species that are acoustically similar to the focal species.
 }
 \examples{
+# load the data
+data(confusable_species)
 # View the first few rows
 head(confusable_species)
 
@@ -35,7 +37,7 @@ head(confusable_species)
 subset(confusable_species, species == "Chorthippus biguttulus")
 }
 \references{
-Ragge, D. R., & Reynolds, W. J. (2023). \emph{The songs of the grasshoppers and crickets of Western Europe}. Brill.
+Ragge, D. R., & Reynolds, W. J. (1998). \emph{The songs of the grasshoppers and crickets of Western Europe}. Colchester: Brill.
 
 Roesti, C., & Keist, B. (2009). \emph{Die Stimmen der Heuschrecken}. Bern: Haupt.
 }

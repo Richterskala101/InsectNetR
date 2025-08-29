@@ -5,7 +5,7 @@ Authors@R:
     person("Dominik", "Arend", , "dmarend9@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-9069-8825"))
 Description: Apply spatio-temporal plausibility checks of predictions, Compute 12-hour aggregated time-series features (ATF) 
-  for Orthoptera detections, and select candidate classification models as suggested by Singer et al. (2024).Ssimplified
+  for Orthoptera detections, and select candidate classification models as suggested by Singer et al. (2024).Simplified
   for speed and reproducibility.
 License: MIT + file LICENSE
 Depends: R (>= 4.1)

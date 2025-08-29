@@ -8,6 +8,63 @@ confusable_species <- read.xlsx("C:/Users/darend/Downloads/Heuschrecken Verwechs
 
 usethis::use_data(confusable_species, compress = "xz")
 
+temporal_phenology <- read.xlsx(("B:/diverses/HearTheSpecies/Database/Insect_Acoustics/most_Traits_all_species.xlsx")) |>
+  dplyr::rename(species = Species_Name,
+                genus = Genus,
+                season_start = Season_Start,
+                season_end = Season_End) #|>
+  #dplyr::mutate() |>
+
+library(dplyr)
+library(tidyr)
+
+# Define function with time_blocks inside
+extract_activity_windows <- function(row) {
+  time_blocks <- data.frame(
+    col = c("SA-09", "09-12", "12-15", "15-18", "18-SU", "SU-24", "24-SA"),
+    start_hour = c(6, 9, 12, 15, 18, 21, 0),
+    end_hour = c(9, 12, 15, 18, 21, 24, 6),
+    stringsAsFactors = FALSE
+  )
+
+  values <- as.numeric(row[time_blocks$col])
+
+  peak_idx <- which(values == 3)
+  inter_idx <- which(values %in% c(1, 2))
+
+  peak_start <- if (length(peak_idx) > 0) min(time_blocks$start_hour[peak_idx]) else NA
+  peak_end   <- if (length(peak_idx) > 0) max(time_blocks$end_hour[peak_idx]) else NA
+
+  inter_only_idx <- setdiff(inter_idx, peak_idx)
+  inter_start <- if (length(inter_only_idx) > 0) min(time_blocks$start_hour[inter_only_idx]) else NA
+  inter_end   <- if (length(inter_only_idx) > 0) max(time_blocks$end_hour[inter_only_idx]) else NA
+
+  return(tibble(
+    peak_activity_start = peak_start,
+    peak_activity_end = peak_end,
+    intermediate_activity_start = inter_start,
+    intermediate_activity_end = inter_end
+  ))
+}
+
+# Apply the function row-wise
+temporal_species_phenology <- temporal_phenology %>%
+  rowwise() %>%
+  mutate(
+    activity_info = list(extract_activity_windows(cur_data()))
+  ) %>%
+  unnest_wider(activity_info) %>%
+  ungroup() |>
+  mutate(intermediate_activity_start =
+           if_else(is.na(intermediate_activity_start), peak_activity_start, intermediate_activity_start),
+         intermediate_activity_end =
+           if_else(is.na(intermediate_activity_end), peak_activity_end, intermediate_activity_end),
+         season_start = as.numeric(season_start),
+         season_end = as.numeric(season_end)) |>
+  select(genus, species, season_start, season_end,
+         peak_activity_start, peak_activity_end,
+         intermediate_activity_start, intermediate_activity_end)
+
 
 
 ' Parse datetime from filename (YYYYMMDD_HHMMSS or similar)
