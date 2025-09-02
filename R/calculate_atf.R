@@ -10,6 +10,10 @@
 #' @param windows_sec integer vector of window sizes in seconds (default: c(9,15,21,27, 1200,2400,3600,4800,7200,14400,28800,43200))
 #' @param max_hours numeric maximum predictor span in hours (default 12). Any window > max_hours*3600 is dropped.
 #' @return data.table of ATF (one row per detection)
+#'
+#' @references
+#' Singer, D., Hagge, J., Kamp, J., Hondong, H. & Schuldt, A. (2024) Aggregated time-series features boost species-specific differentiation of true and false positives in passive acoustic monitoring of bird assemblages, Remote Sensing in Ecology and Conservation, https://doi.org/10.1002/rse2.385
+#'
 #' @export
 calculate_atf <- function(birdnet, species, validated,
                           windows_sec = c(9,15,21,27, 1200,2400,3600,4800, 7200,14400,28800,43200),

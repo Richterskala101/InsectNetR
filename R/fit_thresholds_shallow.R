@@ -1,4 +1,4 @@
-#' Fit shallow conditional inference tree thresholds (Singer et al. 2024 style)
+#' Fit shallow conditional inference tree thresholds (Singer et al. 2024)
 #'
 #' This function reimplements the "shallow tree" thresholding approach from
 #' Singer et al. (2024). It fits species-specific conditional inference trees
@@ -18,6 +18,10 @@
 #' @return data.table of candidate threshold models per species with columns:
 #'   \code{german}, \code{model}, \code{rules}, \code{prec}, \code{recall},
 #'   \code{model_performance}.
+#'
+#' @references
+#' Singer, D., Hagge, J., Kamp, J., Hondong, H. & Schuldt, A. (2024) Aggregated time-series features boost species-specific differentiation of true and false positives in passive acoustic monitoring of bird assemblages, Remote Sensing in Ecology and Conservation, https://doi.org/10.1002/rse2.385
+#'
 #' @export
 fit_thresholds_shallow <- function(atf, w = 0.75,
                                    parallel = TRUE,
