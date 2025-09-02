@@ -38,7 +38,6 @@ A data frame with 137968 rows and 31 columns:
 \item{Stethophyma.grossum}{Probability of \emph{Stethophyma grossum}.}
 \item{Tettigonia.cantans}{Probability of \emph{Tettigonia cantans}.}
 \item{Tettigonia.viridissima}{Probability of \emph{Tettigonia viridissima}.}
-\item{nocall.empty}{Probability that the segment contains no relevant call (background noise, silence, or unidentifiable signal).}
 }
 }
 \usage{

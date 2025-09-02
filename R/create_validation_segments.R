@@ -56,17 +56,17 @@ create_validation_segments <- function(input_csv,
                                        segment_length = 4,
                                        n_per_class = 30,
                                        output_csv = NULL) {
-  preds <- utils::read.csv(input_csv) %>%
+  preds <- utils::read.csv(input_csv)  |>
     dplyr::mutate(
       start = as.numeric(sub("^(\\d+\\.?\\d*)-.*", "\\1", offset)),
       end   = as.numeric(sub(".*-(\\d+\\.?\\d*)$", "\\1", offset))
-    ) %>%
+    ) |>
     dplyr::filter(!is.na(start), !is.na(end))
 
   skip_cols <- c("offset", "prediction", "start", "end", "filename")
-  species_cols <- preds %>%
-    dplyr::select(-dplyr::one_of(skip_cols)) %>%
-    dplyr::select_if(is.numeric) %>%
+  species_cols <- preds |>
+    dplyr::select(-dplyr::one_of(skip_cols)) |>
+    dplyr::select_if(is.numeric) |>
     names()
 
   fs::dir_create(output_folder)
@@ -74,9 +74,9 @@ create_validation_segments <- function(input_csv,
   for (sp in species_cols) {
     message("Processing species: ", sp)
 
-    top_rows <- preds %>%
-      dplyr::filter(.data[[sp]] > 0) %>%
-      dplyr::arrange(dplyr::desc(.data[[sp]])) %>%
+    top_rows <- preds |>
+      dplyr::filter(.data[[sp]] > 0) |>
+      dplyr::arrange(dplyr::desc(.data[[sp]])) |>
       dplyr::slice_head(n = n_per_class)
 
     if (nrow(top_rows) == 0) {
@@ -114,7 +114,7 @@ create_validation_segments <- function(input_csv,
   }
 
   filelist <- list.files(output_folder, recursive = TRUE)
-  summary_df <- data.frame(filelist) %>%
+  summary_df <- data.frame(filelist) |>
     dplyr::mutate(
       file    = basename(filelist),
       species = stringr::str_extract(filelist, "^[^/]+"),

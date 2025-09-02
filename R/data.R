@@ -34,7 +34,6 @@
 #'   \item{Stethophyma.grossum}{Probability of *Stethophyma grossum*.}
 #'   \item{Tettigonia.cantans}{Probability of *Tettigonia cantans*.}
 #'   \item{Tettigonia.viridissima}{Probability of *Tettigonia viridissima*.}
-#'   \item{nocall.empty}{Probability that the segment contains no relevant call (background noise, silence, or unidentifiable signal).}
 #' }
 #' @examples
 #' # load the data
