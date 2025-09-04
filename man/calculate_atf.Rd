@@ -31,3 +31,6 @@ Vectorized and data.table-based reimplementation of Singer et al. style ATF.
 Uses interval joins (foverlaps) to compute stats in windows around each
 validated detection, limiting predictor windows to a maximum span.
 }
+\references{
+Singer, D., Hagge, J., Kamp, J., Hondong, H. & Schuldt, A. (2024) Aggregated time-series features boost species-specific differentiation of true and false positives in passive acoustic monitoring of bird assemblages, Remote Sensing in Ecology and Conservation, https://doi.org/10.1002/rse2.385
+}

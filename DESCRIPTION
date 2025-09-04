@@ -21,7 +21,10 @@ Imports:
     shinyFiles,
     tuneR,
     seewave,
-    fs
+    fs,
+    av,
+    graphics,
+    viridisLite
 Suggests:
     ggplot2,
     testthat (>= 3.0.0),

@@ -2,7 +2,7 @@
 % Please edit documentation in R/fit_thresholds_shallow.R
 \name{fit_thresholds_shallow}
 \alias{fit_thresholds_shallow}
-\title{Fit shallow conditional inference tree thresholds (Singer et al. 2024 style)}
+\title{Fit shallow conditional inference tree thresholds (Singer et al. 2024)}
 \usage{
 fit_thresholds_shallow(
   atf,
@@ -35,4 +35,7 @@ Singer et al. (2024). It fits species-specific conditional inference trees
 with max depth 1 (type 1 models) and max depth 2 (type 2 models) using
 all aggregated time-series features. Candidate models are then evaluated
 by precision, recall, and a weighted performance metric.
+}
+\references{
+Singer, D., Hagge, J., Kamp, J., Hondong, H. & Schuldt, A. (2024) Aggregated time-series features boost species-specific differentiation of true and false positives in passive acoustic monitoring of bird assemblages, Remote Sensing in Ecology and Conservation, https://doi.org/10.1002/rse2.385
 }

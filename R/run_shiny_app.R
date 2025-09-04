@@ -36,7 +36,6 @@
 #' }
 #'
 #' @export
-
 run_shiny_app <- function() {
   # ==== UI ====
   ui <- shiny::fluidPage(
@@ -60,8 +59,10 @@ run_shiny_app <- function() {
                           shiny::actionButton("proceed", "Go to Review Page", class = "btn-primary")
                         ),
                         shiny::mainPanel(
-                          shiny::helpText("Step 1: Choose the folder containing the audio segments.",
-                                          "Then choose where the results should be saved and set a filename.")
+                          shiny::helpText(
+                            "Step 1: Choose the folder containing the audio segments.",
+                            "Then choose where the results should be saved and set a filename."
+                          )
                         )
                       )
       ),
@@ -72,6 +73,15 @@ run_shiny_app <- function() {
                           shiny::actionButton("load_data", "Load Segment Classes"),
                           shiny::uiOutput("class_ui"),
                           shiny::numericInput("segment_duration", "Segment Duration (seconds)", value = 5, min = 1),
+
+                          shiny::hr(),
+                          shiny::h4("Spectrogram Settings"),
+                          shiny::numericInput("fft_window_length", "FFT Window Length", value = 1024, min = 128),
+                          shiny::sliderInput("overlap", "Overlap", min = 0, max = 0.95, value = 0.75, step = 0.05),
+                          shiny::numericInput("max_freq", "Max Frequency (kHz)", value = 16, min = 1),
+                          shiny::checkboxInput("dark_mode", "Dark Mode", value = FALSE),
+                          shiny::hr(),
+
                           shiny::actionButton("correct", "Correct", class = "btn-success"),
                           shiny::actionButton("incorrect", "Incorrect", class = "btn-danger"),
                           shiny::actionButton("skip", "Skip"),
@@ -80,21 +90,27 @@ run_shiny_app <- function() {
                           shiny::verbatimTextOutput("clip_info"),
                           shiny::uiOutput("audio_ui"),
                           shiny::br(), shiny::br(),
-                          shiny::helpText("This app allows you to manually validate predicted segments from an audio classification model.",
-                                          "After enough annotations, a logistic regression is fitted to calibrate model scores into probabilities.",
-                                          "Thresholds are calculated for precision levels 0.7, 0.8, and 0.9."),
+                          shiny::helpText(
+                            "This app allows you to manually validate predicted segments from an audio classification model.",
+                            "After enough annotations, a logistic regression is fitted to calibrate model scores into probabilities.",
+                            "Thresholds are calculated for precision levels 0.7, 0.8, and 0.9."
+                          ),
                           shiny::plotOutput("logisticPlot"),
                           shiny::downloadButton("downloadPlot", "Download Logistic Plot"),
                           shiny::tableOutput("thresholds")
                         ),
 
                         shiny::mainPanel(
-                          shiny::plotOutput("spectrogram", brush = shiny::brushOpts(id = "spec_brush", resetOnNew = TRUE),
-                                            dblclick = "spec_dblclick"),
+                          shiny::plotOutput(
+                            "spectrogram",
+                            brush = shiny::brushOpts(id = "spec_brush", resetOnNew = TRUE),
+                            dblclick = "spec_dblclick",
+                            height = "500px"
+                          ),
                           shiny::br(),
                           shiny::HTML("<p><strong>Zoom Instructions:</strong><br>
-                         Click and drag on the spectrogram to zoom into a region.<br>
-                         Double-click anywhere on the spectrogram to reset the zoom.</p>")
+               Click and drag on the spectrogram to zoom into a region.<br>
+               Double-click anywhere on the spectrogram to reset the zoom.</p>")
                         )
                       )
       )
@@ -259,21 +275,22 @@ run_shiny_app <- function() {
       state$zoom_freq <- NULL
     })
 
+    # ==== CUSTOM SPECTROGRAM ====
     output$spectrogram <- shiny::renderPlot({
-      wav <- tuneR::readWave(current_file())
-      seewave::spectro(
-        wav,
-        wl = 512,
-        palette = heat.colors,
-        contrast = 0.53,
-        dB = "A",
-        dynrange = 64,
-        tlim = state$zoom_time,
-        flim = state$zoom_freq,
-        main = basename(current_file())
+      shiny::req(current_file())
+
+      plot_av_fft(
+        path_to_file = current_file(),
+        fft_window_length = input$fft_window_length,
+        overlap = input$overlap,
+        max_freq = input$max_freq,
+        dark = input$dark_mode,
+        tstart = if (!is.null(state$zoom_time)) state$zoom_time[1] else 0,
+        tende  = if (!is.null(state$zoom_time)) state$zoom_time[2] else NULL
       )
     })
 
+    # Logistic regression calibration
     output$logisticPlot <- shiny::renderPlot({
       val <- state$data
       shiny::req(input$class)
@@ -342,7 +359,7 @@ run_shiny_app <- function() {
       }
     })
   }
+
   # ==== RUN APP ====
   shiny::shinyApp(ui = ui, server = server)
 }
-

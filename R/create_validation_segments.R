@@ -65,7 +65,7 @@ create_validation_segments <- function(input_csv,
 
   skip_cols <- c("offset", "prediction", "start", "end", "filename")
   species_cols <- preds |>
-    dplyr::select(-dplyr::one_of(skip_cols)) |>
+    dplyr::select(-dplyr::any_of(skip_cols)) |>
     dplyr::select_if(is.numeric) |>
     names()
 
