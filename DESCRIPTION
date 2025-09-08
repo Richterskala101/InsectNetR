@@ -24,7 +24,8 @@ Imports:
     fs,
     av,
     graphics,
-    viridisLite
+    viridisLite,
+    rgbif
 Suggests:
     ggplot2,
     testthat (>= 3.0.0),
