@@ -3,41 +3,52 @@
 \name{get_gbif_ranges}
 \alias{get_gbif_ranges}
 \title{Build GBIF-based species ranges at ~10 km resolution
+#' Build GBIF-based species ranges at ~10 km resolution
 Retrieves occurrence data from GBIF via \pkg{rgbif} and aggregates them
-into a gridded species range map at the specified resolution.
-The result is an \code{sf} polygon object suitable for spatial plausibility checks.}
+into a gridded species range map at the specified resolution.}
 \usage{
-get_gbif_ranges(species, res = 10, limit = 200, region = "world")
+get_gbif_ranges(
+  species,
+  res = 10,
+  limit = 20000,
+  region = "world",
+  collect_citations = FALSE
+)
 }
 \arguments{
 \item{species}{Character vector of species names, or a column from a data.frame.}
 
 \item{res}{Numeric. Grid resolution in kilometers. Default is 10.}
 
-\item{limit}{Integer. Maximum number of GBIF records per species. Default is 200.}
+\item{limit}{Integer. Maximum number of GBIF records per species. Default is 20000.}
 
-\item{region}{Character. One of \code{"world"}, \code{"europe"}, \code{"asia"}, \code{"americas"}.
-Defines the bounding box used for the GBIF query. Default is \code{"world"}.}
+\item{region}{Character. One of "world", "europe", "asia", "americas".
+Defines the bounding box used for the GBIF query. Default is "world".}
+
+\item{collect_citations}{Logical. If TRUE, dataset citations are retrieved
+and attached as an attribute of the returned sf object.}
 }
 \value{
-An \code{sf} polygon object with a column \code{species}.
+An \code{sf} polygon object with a column \code{species}. If \code{collect_citations=TRUE},
+a \code{citations} attribute is attached (data.frame with datasetKey, title, citation).
 }
 \description{
-Build GBIF-based species ranges at ~10 km resolution
-Retrieves occurrence data from GBIF via \pkg{rgbif} and aggregates them
-into a gridded species range map at the specified resolution.
 The result is an \code{sf} polygon object suitable for spatial plausibility checks.
+A citation for the used datsets can also be exported. Please cite the data accordingly.
 }
 \examples{
 \dontrun{
 library(sf)
-sp_vec <- c("Pseudochorthippus apicarius", "Barbitistes constrictus")
+sp_vec <- c("Tettigonia viridissima", "Barbitistes serricauda")
 
 # Retrieve ranges for Europe only
-ranges_eu <- get_gbif_ranges(sp_vec, res = 10, region = "europe")
+ranges_eu <- get_gbif_ranges(sp_vec, res = 10, region = "europe", return_citation = TRUE)
 
 # Plot result
 plot(st_geometry(ranges_eu), col = "lightblue", border = "darkblue")
+
+# plot citations
+
 }
 
 }

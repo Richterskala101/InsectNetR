@@ -1,66 +1,80 @@
-#' Apply species-specific threshold models to ATF detections
+#' Apply Confidence Score Thresholds to Predictions
 #'
-#' This function filters detections based on species-specific threshold rules,
-#' either from the shallow Singer-style models (\code{fit_thresholds_shallow})
-#' or from big-tree models (\code{fit_thresholds_big}).
+#' This function thresholds model predictions using either a uniform cutoff or
+#' species-specific thresholds. Predictions greater than or equal to the chosen
+#' threshold become `1`, and values below become `0`.
 #'
-#' @param atf data.table or data.frame containing aggregated time-series
-#'   features, including columns \code{detID}, \code{german}, \code{conf}, etc.
-#'   as produced by \code{calculate_atf()}.
-#' @param thresholds Either:
-#'   - a \code{data.table} of threshold rules from \code{fit_thresholds_shallow()},
-#'   - or a named list of \code{partykit::ctree} objects from \code{fit_thresholds_big()}.
-#' @param type character, one of \code{"shallow"} or \code{"big"}, indicating
-#'   the format of \code{thresholds}.
+#' @param predictions A `data.frame` containing model predictions, where the first
+#'   two columns are metadata (e.g., filename, offset) and all subsequent columns
+#'   are species confidence scores.
+#' @param threshold Either a single numeric value (uniform threshold applied to all
+#'   species) or a `data.frame` with two columns: `species` (character) and
+#'   `cutoff` (numeric), defining species-specific thresholds.
+#' @param metadata_cols Integer. The number of leading metadata columns in
+#'   `predictions` that should be preserved (default: `2`).
 #'
-#' @return data.table of detections with an additional column \code{keep}
-#'   indicating whether the detection passed the thresholding.
+#' @return A `data.frame` of the same shape as `predictions`, with confidence
+#'   scores replaced by `0` or `1` according to the thresholding rules.
+#' @examples
+#' \dontrun{
+#' # get data to try
+#' data(predictions)
+#'
+#' # Uniform threshold
+#' bin_preds <- apply_thresholds(predictions, threshold = 0.5)
+#' head(bin_preds)
+#'
+#' # load example species-specific thresholds
+#' data(custom_thresholds)
+#' bin_preds <- apply_thresholds(predictions, threshold = thresholds)
+#' head(bin_preds)
+#' }
 #' @export
-apply_thresholds <- function(atf, thresholds, type = c("shallow","big")) {
-  requireNamespace("data.table")
-  requireNamespace("partykit")
+apply_thresholds <- function(predictions, threshold, metadata_cols = 2) {
 
-  dt <- data.table::as.data.table(atf)
-  type <- match.arg(type)
+  # Extract species names from predictions
+  species_cols <- colnames(predictions)[(metadata_cols + 1):ncol(predictions)]
 
-  if (type == "shallow") {
-    if (!all(c("german","rules") %in% names(thresholds))) {
-      stop("Thresholds must come from fit_thresholds_shallow()")
-    }
-
-    dt[, keep := FALSE]
-
-    for (sp in unique(thresholds$german)) {
-      rules <- thresholds[german == sp, rules][1]  # first rule
-      if (is.na(rules) || rules == "") next
-
-      # Build logical expression
-      expr <- parse(text = rules)
-
-      # Apply within-species
-      idx <- which(dt$german == sp)
-      dt$keep[idx] <- with(dt[idx,], eval(expr))
-    }
+  # If uniform threshold
+  if (is.numeric(threshold) && length(threshold) == 1) {
+    preds_bin <- predictions
+    preds_bin[, species_cols] <- lapply(preds_bin[, species_cols, drop = FALSE],
+                                        function(x) as.integer(x >= threshold))
+    return(preds_bin)
   }
 
-  if (type == "big") {
-    if (!is.list(thresholds) || !all(sapply(thresholds, inherits, "BinaryTree"))) {
-      stop("Thresholds must be a list of ctree models from fit_thresholds_big()")
+  # If species-specific thresholds
+  if (is.data.frame(threshold) &&
+      all(c("species", "cutoff") %in% colnames(threshold))) {
+
+    # Normalize species names for matching
+    normalize_name <- function(x) {
+      gsub("[[:punct:]_ ]+", ".", x) |> tolower()
     }
 
-    dt[, keep := FALSE]
+    species_pred_norm <- normalize_name(species_cols)
+    species_thr_norm <- normalize_name(threshold$species)
 
-    for (sp in names(thresholds)) {
-      mod <- thresholds[[sp]]
-      if (is.null(mod)) next
-      sub <- dt[german == sp]
-      if (nrow(sub) == 0) next
+    # Initialize output
+    preds_bin <- predictions
 
-      preds <- predict(mod, newdata = sub, type = "response")
-      dt[german == sp, keep := (preds == 1)]
+    for (i in seq_along(species_cols)) {
+      sp_col <- species_cols[i]
+      sp_norm <- species_pred_norm[i]
+
+      # Match threshold
+      idx <- match(sp_norm, species_thr_norm)
+      if (!is.na(idx)) {
+        thr_val <- threshold$cutoff[idx]
+      } else {
+        stop(paste("No threshold found for species:", sp_col))
+      }
+
+      preds_bin[[sp_col]] <- as.integer(preds_bin[[sp_col]] >= thr_val)
     }
+
+    return(preds_bin)
   }
 
-  data.table::setorder(dt, german, Plot_ID, timestamp)
-  dt
+  stop("`threshold` must be either a numeric value or a data.frame with 'species' and 'cutoff' columns.")
 }

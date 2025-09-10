@@ -1,3 +1,32 @@
+
+species_info_temporal <- temporal_species_phenology %>%
+  +     dplyr::transmute(
+    +         species = gsub(" ", ".", species),  # match wide column names
+    +         start_date = sprintf("%02d-01", season_start),  # month → MM-01
+    +         end_date   = sprintf("%02d-28", season_end),    # rough month end
+    +         start_hour = peak_activity_start,
+    +         end_hour   = peak_activity_end
+    +     )
+
+
+# take all species columns (assuming first two are metadata)
+species_cols <- colnames(predictions)[3:ncol(predictions)]
+
+# create a dummy thresholds table with random cutoffs
+set.seed(123)  # for reproducibility
+custom_thresholds <- data.frame(
+  species = species_cols,
+  cutoff = runif(length(species_cols), min = 0.2, max = 0.8),
+  stringsAsFactors = FALSE
+)
+
+# check result
+head(custom_thresholds)
+
+# save it into your package
+usethis::use_data(custom_thresholds, overwrite = TRUE, compress = "xz")
+
+
 library(openxlsx)
 confusable_species <- read.xlsx("C:/Users/darend/Downloads/Heuschrecken Verwechslungen Matrix.xlsx") |>
   dplyr::mutate(Verwechslung.1 = ifelse(Verwechslung.1 == "x", NA, Verwechslung.1)) |>
@@ -6,7 +35,7 @@ confusable_species <- read.xlsx("C:/Users/darend/Downloads/Heuschrecken Verwechs
          confusion_species_2 = Verwechslung.2,
          confusion_species_3 = Verwechslung.3)
 
-usethis::use_data(confusable_species, compress = "xz")
+usethis::use_data(confusable_species, compress = "bzip")
 
 temporal_phenology <- read.xlsx(("B:/diverses/HearTheSpecies/Database/Insect_Acoustics/most_Traits_all_species.xlsx")) |>
   dplyr::rename(species = Species_Name,

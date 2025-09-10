@@ -105,3 +105,19 @@
 #'
 #' Roesti, C., & Keist, B. (2009). *Die Stimmen der Heuschrecken*. Bern: Haupt.
 "temporal_species_phenology"
+#' Species-specific Thresholds (Dummy Data)
+#'
+#' A dataset containing dummy cutoff thresholds for all species present
+#' in the example \code{predictions} dataset. Threshold values are randomly
+#' sampled between 0.2 and 0.8 for demonstration purposes.
+#'
+#' @format A data frame with \eqn{n} rows (one per species) and 2 variables:
+#' \describe{
+#'   \item{species}{Character. Species names corresponding to the prediction columns.}
+#'   \item{cutoff}{Numeric. Dummy threshold values between 0.2 and 0.8.}
+#' }
+#'
+#' @examples
+#' data(custom_thresholds)
+#' head(custom_thresholds)
+"custom_thresholds"

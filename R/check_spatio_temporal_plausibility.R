@@ -1,12 +1,23 @@
-#' Flag spatio-temporal plausibility
+#' Flag spatio-temporal violations (wide format, fully robust)
 #'
-#' @param predictions data.frame with columns: species, timestamp, plot_id
-#' @param species_info_temporal data.frame with temporal info: species, start_date, end_date, start_hour, end_hour
-#' @param species_ranges sf object with spatial ranges (polygons) and column `species`
-#' @param plot_info data.frame with plot_id and coordinates: lat, lon
-#' @param tz time zone for time-of-day checks
+#' Checks temporal (season / time-of-day) and spatial (range polygon) plausibility
+#' for presence/absence columns in a wide predictions table (like `bin_preds`),
+#' and directly flags violations.
 #'
-#' @return original data with logical flag columns: season, time_of_day, range, and plausibility_score (sum of flags)
+#' Violations are coded as:
+#' - 1 = problematic / implausible
+#' - 0 = plausible / no issue
+#'
+#' @param predictions data.frame with at least `filename`, `offset`, and species columns (0/1).
+#' @param species_info_temporal data.frame with species temporal info:
+#'   `genus` + `species` or `species` and `season_start`, `season_end`, `peak_activity_start`, `peak_activity_end`.
+#' @param species_ranges sf object with polygons and a column `species`.
+#' @param plot_info data.frame with columns `plot_id`, `lat`, `lon`.
+#' @param tz time zone for timestamps (default `"UTC"`).
+#'
+#' @return A data.frame with original columns + violation flags per species:
+#'   `<species>_season_violation`, `<species>_time_violation`, `<species>_range_violation`,
+#'   `<species>_violation_score`.
 #' @export
 check_spatio_temporal_plausibility <- function(predictions,
                                                species_info_temporal,
@@ -14,55 +25,110 @@ check_spatio_temporal_plausibility <- function(predictions,
                                                plot_info,
                                                tz = "UTC") {
 
-  # Convert to data.table
-  dt <- data.table::as.data.table(predictions)
-  si <- data.table::as.data.table(species_info_temporal)
-  pi <- data.table::as.data.table(plot_info)
+  normalize <- function(x) tolower(gsub("[._ ]+", "_", as.character(x)))
+  df <- as.data.frame(predictions, stringsAsFactors = FALSE)
+  species_cols <- setdiff(colnames(df), c("filename", "offset"))
 
-  # Ensure timestamp is POSIXct
-  if (!inherits(dt$timestamp, "POSIXct")) {
-    dt$timestamp <- as.POSIXct(dt$timestamp, tz = tz)
+  # parse timestamp from filename + offset
+  basename_noext <- sub("\\.WAV$|\\.wav$", "", basename(df$filename))
+  base_ts <- as.POSIXct(basename_noext, format = "%Y%m%d_%H%M%S", tz = tz)
+  start_offset <- suppressWarnings(as.numeric(sub("^(\\d+\\.?\\d*)-.*", "\\1", df$offset)))
+  start_offset[is.na(start_offset)] <- 0
+  df$timestamp <- base_ts + start_offset
+  df$date <- as.Date(lubridate::with_tz(df$timestamp, tzone = tz))
+  df$hour <- as.integer(lubridate::hour(lubridate::with_tz(df$timestamp, tzone = tz)))
+  df$plot_id <- dirname(df$filename)
+
+  # merge plot coordinates
+  df <- merge(df, plot_info, by = "plot_id", all.x = TRUE, sort = FALSE)
+
+  # Prepare temporal info
+  si <- as.data.frame(species_info_temporal, stringsAsFactors = FALSE)
+  if (all(c("genus", "species") %in% names(si))) {
+    si$species_full <- paste(si$genus, si$species)
+  } else if ("species" %in% names(si)) {
+    si$species_full <- si$species
+  } else {
+    stop("species_info_temporal must contain either 'species' or both 'genus' and 'species'.")
+  }
+  si$species_norm <- normalize(si$species_full)
+  si$start_month <- si$season_start
+  si$end_month <- si$season_end
+  si$start_hour <- si$peak_activity_start
+  si$end_hour <- si$peak_activity_end
+
+  # Prepare ranges
+  species_ranges$species_norm <- normalize(species_ranges$species)
+  old_s2 <- sf::sf_use_s2(FALSE)
+  on.exit(sf::sf_use_s2(old_s2), add = TRUE)
+  sf_points <- sf::st_as_sf(df, coords = c("lon", "lat"), crs = 4326, remove = FALSE)
+
+  for (sp in species_cols) {
+    sp_norm <- normalize(sp)
+    si_idx <- match(sp, si$species)
+    if (length(si_idx) == 0 || is.na(si_idx)) {
+      warning("Species '", sp, "' not found in temporal info; marking season/time as violation")
+      season_violation <- rep(1L, nrow(df))
+      time_violation   <- rep(1L, nrow(df))
+    } else {
+      # --- season ---
+      start_d <- si$start_date[si_idx]
+      end_d   <- si$end_date[si_idx]
+      if (length(start_d) == 0 || length(end_d) == 0 || is.na(start_d) || is.na(end_d)) {
+        warning("Species '", sp, "' missing start/end date; marking season as violation")
+        season_violation <- rep(1L, nrow(df))
+      } else {
+        season_flag <- vapply(df$date, FUN.VALUE = logical(1), FUN = function(d) {
+          yr <- lubridate::year(d)
+          sd_full <- as.Date(paste0(yr, "-", start_d))
+          ed_full <- as.Date(paste0(yr, "-", end_d))
+          if (sd_full <= ed_full) {
+            d >= sd_full & d <= ed_full
+          } else {
+            d >= sd_full | d <= ed_full
+          }
+        })
+        season_violation <- as.integer(!season_flag)
+      }
+
+      # --- time ---
+      start_h <- si$start_hour[si_idx]
+      end_h   <- si$end_hour[si_idx]
+      if (length(start_h) == 0 || length(end_h) == 0 || is.na(start_h) || is.na(end_h)) {
+        warning("Species '", sp, "' missing start/end hour; marking time as violation")
+        time_violation <- rep(1L, nrow(df))
+      } else {
+        if (start_h <= end_h) {
+          time_flag <- df$hour >= start_h & df$hour <= end_h
+        } else {
+          time_flag <- df$hour >= start_h | df$hour <= end_h
+        }
+        time_violation <- as.integer(!time_flag)
+      }
+    }
+
+    # --- Range violation ---
+    sp_polys <- species_ranges[species_ranges$species_norm == sp_norm, ]
+    if (nrow(sp_polys) == 0) {
+      warning("Species '", sp, "' not found in species_ranges; marking range as violation")
+      range_violation <- rep(1L, nrow(df))
+    } else {
+      within_mat <- sf::st_within(sf_points, sp_polys, sparse = FALSE)
+      if (is.matrix(within_mat)) {
+        range_flag <- rowSums(within_mat, na.rm = TRUE) > 0
+      } else {
+        range_flag <- as.logical(within_mat)
+      }
+      range_violation <- as.integer(!range_flag)
+    }
+
+    # assign flags
+    df[[paste0(sp, "_season_violation")]] <- season_violation
+    df[[paste0(sp, "_time_violation")]] <- time_violation
+    df[[paste0(sp, "_range_violation")]] <- range_violation
+    df[[paste0(sp, "_violation_score")]] <- season_violation + time_violation + range_violation
   }
 
-  # Extract date and hour
-  dt$date <- as.Date(lubridate::with_tz(dt$timestamp, tzone = tz))
-  dt$hour <- as.integer(lubridate::hour(lubridate::with_tz(dt$timestamp, tzone = tz)))
-
-  # Merge temporal info + plot info
-  dt <- data.table::merge.data.table(dt, si, by = "species", all.x = TRUE)
-  dt <- data.table::merge.data.table(dt, pi, by = "plot_id", all.x = TRUE)
-
-  # --- Temporal plausibility ---
-  dt$season <- mapply(function(d, sd, ed) {
-    sd_full <- as.Date(paste0(lubridate::year(d), "-", sd))
-    ed_full <- as.Date(paste0(lubridate::year(d), "-", ed))
-    if (sd_full <= ed_full) {
-      d >= sd_full & d <= ed_full
-    } else {
-      d >= sd_full | d <= ed_full
-    }
-  }, dt$date, dt$start_date, dt$end_date)
-
-  dt$time_of_day <- dt$hour >= dt$start_hour & dt$hour <= dt$end_hour
-
-  # --- Spatial plausibility ---
-  # Disable spherical geometry (planar for bounding boxes)
-  old_s2 <- sf::sf_use_s2(FALSE)
-  on.exit(sf::sf_use_s2(old_s2), add = TRUE)  # restore original setting
-
-  sf_points <- sf::st_as_sf(dt, coords = c("lon", "lat"), crs = 4326)
-
-  sf_joined <- sf::st_join(sf_points, species_ranges, join = sf::st_within, left = TRUE, suffix = c("", "_range"))
-
-  # Range check
-  sf_joined$range <- !is.na(sf_joined$species_range) & (sf_joined$species == sf_joined$species_range)
-
-  # Deduplicate: keep only rows where species matched its polygon
-  sf_joined <- sf_joined[sf_joined$range | is.na(sf_joined$species_range), ]
-
-  # Finalize output
-  out <- data.table::as.data.table(sf_joined)
-  out$plausibility_score <- out$season + out$time_of_day + out$range
-
-  return(out[])
+  rownames(df) <- NULL
+  return(df)
 }
