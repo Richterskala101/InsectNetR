@@ -5,7 +5,7 @@
 \alias{predictions}
 \title{Exemplary predictions of Orthoptera on audio recordings}
 \format{
-A data frame with 137968 rows and 31 columns:
+A data frame with 2951 rows and 31 columns:
 \describe{
 \item{filename}{Relative file path to the original WAV audio recording (character).}
 \item{offset}{Time segment of the audio file used for prediction, formatted as \code{"start-end"} in seconds (character).}

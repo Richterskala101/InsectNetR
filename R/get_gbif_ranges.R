@@ -8,7 +8,7 @@
 #'
 #' @param species Character vector of species names, or a column from a data.frame.
 #' @param res Numeric. Grid resolution in kilometers. Default is 10.
-#' @param limit Integer. Maximum number of GBIF records per species. Default is 20000.
+#' @param limit Integer. Maximum number of GBIF records per species. Default is 200.
 #' @param region Character. One of "world", "europe", "asia", "americas".
 #'   Defines the bounding box used for the GBIF query. Default is "world".
 #' @param collect_citations Logical. If TRUE, dataset citations are retrieved
@@ -35,7 +35,7 @@
 #' @export
 get_gbif_ranges <- function(species,
                                   res = 10,
-                                  limit = 20000,
+                                  limit = 200,
                                   region = "world",
                                   collect_citations = FALSE) {
   if (is.data.frame(species)) {
@@ -81,18 +81,51 @@ get_gbif_ranges <- function(species,
         fields = c("decimalLatitude", "decimalLongitude", "datasetKey")
       )$data
     }, error = function(e) NULL)
+
     if (is.null(occ) || nrow(occ) == 0) next
 
+    # 🧼 Clean missing coordinates
+    occ <- occ[!is.na(occ$decimalLatitude) & !is.na(occ$decimalLongitude), ]
+    if (nrow(occ) == 0) next  # skip if nothing left after cleaning
     dataset_keys <- c(dataset_keys, unique(occ$datasetKey))
 
     # 3. sf conversion
-    pts <- sf::st_as_sf(occ,
-                        coords = c("decimalLongitude", "decimalLatitude"),
-                        crs = 4326, remove = FALSE)
+    # 3. sf conversion
+    occ <- occ[!is.na(occ$decimalLatitude) & !is.na(occ$decimalLongitude), ]
+    if (nrow(occ) == 0) {
+      warning("All coordinates missing for ", sp)
+      next
+    }
 
-    pts_proj <- sf::st_transform(pts, 6933) # Equal Area
+    pts <- tryCatch({
+      sf::st_as_sf(occ,
+                   coords = c("decimalLongitude", "decimalLatitude"),
+                   crs = 4326, remove = FALSE)
+    }, error = function(e) {
+      warning("Failed to convert to sf for ", sp)
+      return(NULL)
+    })
+    if (is.null(pts)) next
 
-    grid <- sf::st_make_grid(pts_proj, cellsize = res * 1000, square = TRUE)
+    pts_proj <- tryCatch({
+      sf::st_transform(pts, 6933) # Equal Area projection
+    }, error = function(e) {
+      warning("Projection failed for ", sp)
+      return(NULL)
+    })
+    if (is.null(pts_proj) || nrow(pts_proj) == 0 || all(sf::st_is_empty(pts_proj))) {
+      warning("No valid projected points for ", sp)
+      next
+    }
+
+    grid <- tryCatch({
+      sf::st_make_grid(pts_proj, cellsize = res * 1000, square = TRUE)
+    }, error = function(e) {
+      warning("Grid creation failed for ", sp)
+      return(NULL)
+    })
+    if (is.null(grid)) next
+
     grid_sf <- sf::st_sf(geometry = grid)
     grid_sel <- grid_sf[lengths(sf::st_intersects(grid_sf, pts_proj)) > 0, ]
 

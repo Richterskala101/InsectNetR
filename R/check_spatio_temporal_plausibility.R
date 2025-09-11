@@ -29,7 +29,7 @@ check_spatio_temporal_plausibility <- function(predictions,
   df <- as.data.frame(predictions, stringsAsFactors = FALSE)
   species_cols <- setdiff(colnames(df), c("filename", "offset"))
 
-  # parse timestamp from filename + offset
+  # Parse timestamp from filename + offset
   basename_noext <- sub("\\.WAV$|\\.wav$", "", basename(df$filename))
   base_ts <- as.POSIXct(basename_noext, format = "%Y%m%d_%H%M%S", tz = tz)
   start_offset <- suppressWarnings(as.numeric(sub("^(\\d+\\.?\\d*)-.*", "\\1", df$offset)))
@@ -39,10 +39,15 @@ check_spatio_temporal_plausibility <- function(predictions,
   df$hour <- as.integer(lubridate::hour(lubridate::with_tz(df$timestamp, tzone = tz)))
   df$plot_id <- dirname(df$filename)
 
-  # merge plot coordinates
+  # Merge plot coordinates
   df <- merge(df, plot_info, by = "plot_id", all.x = TRUE, sort = FALSE)
 
-  # Prepare temporal info
+  # If coordinates column is named "long", rename to "lon"
+  if (!"lon" %in% names(df) && "long" %in% names(df)) {
+    df$lon <- df$long
+  }
+
+  # Normalize species names in input tables
   si <- as.data.frame(species_info_temporal, stringsAsFactors = FALSE)
   if (all(c("genus", "species") %in% names(si))) {
     si$species_full <- paste(si$genus, si$species)
@@ -57,26 +62,40 @@ check_spatio_temporal_plausibility <- function(predictions,
   si$start_hour <- si$peak_activity_start
   si$end_hour <- si$peak_activity_end
 
-  # Prepare ranges
   species_ranges$species_norm <- normalize(species_ranges$species)
+
+  # Convert to spatial points
   old_s2 <- sf::sf_use_s2(FALSE)
   on.exit(sf::sf_use_s2(old_s2), add = TRUE)
   sf_points <- sf::st_as_sf(df, coords = c("lon", "lat"), crs = 4326, remove = FALSE)
 
   for (sp in species_cols) {
     sp_norm <- normalize(sp)
-    si_idx <- match(sp, si$species)
+
+    # --- Skip species not detected anywhere ---
+    detected <- df[[sp]] > 0
+    if (!any(detected, na.rm = TRUE)) {
+      df[[paste0(sp, "_season_violation")]] <- NA_integer_
+      df[[paste0(sp, "_time_violation")]]   <- NA_integer_
+      df[[paste0(sp, "_range_violation")]]  <- NA_integer_
+      df[[paste0(sp, "_violation_score")]]  <- NA_integer_
+      next
+    }
+
+    # --- season ---
+    si_idx <- match(sp_norm, si$species_norm)
     if (length(si_idx) == 0 || is.na(si_idx)) {
       warning("Species '", sp, "' not found in temporal info; marking season/time as violation")
-      season_violation <- rep(1L, nrow(df))
-      time_violation   <- rep(1L, nrow(df))
+      season_violation <- rep(NA_integer_, nrow(df))
+      season_violation[detected] <- 1L
+      time_violation <- season_violation
     } else {
-      # --- season ---
       start_d <- si$start_date[si_idx]
       end_d   <- si$end_date[si_idx]
       if (length(start_d) == 0 || length(end_d) == 0 || is.na(start_d) || is.na(end_d)) {
         warning("Species '", sp, "' missing start/end date; marking season as violation")
-        season_violation <- rep(1L, nrow(df))
+        season_violation <- rep(NA_integer_, nrow(df))
+        season_violation[detected] <- 1L
       } else {
         season_flag <- vapply(df$date, FUN.VALUE = logical(1), FUN = function(d) {
           yr <- lubridate::year(d)
@@ -88,7 +107,8 @@ check_spatio_temporal_plausibility <- function(predictions,
             d >= sd_full | d <= ed_full
           }
         })
-        season_violation <- as.integer(!season_flag)
+        season_violation <- rep(NA_integer_, nrow(df))
+        season_violation[detected] <- as.integer(!season_flag[detected])
       }
 
       # --- time ---
@@ -96,14 +116,16 @@ check_spatio_temporal_plausibility <- function(predictions,
       end_h   <- si$end_hour[si_idx]
       if (length(start_h) == 0 || length(end_h) == 0 || is.na(start_h) || is.na(end_h)) {
         warning("Species '", sp, "' missing start/end hour; marking time as violation")
-        time_violation <- rep(1L, nrow(df))
+        time_violation <- rep(NA_integer_, nrow(df))
+        time_violation[detected] <- 1L
       } else {
-        if (start_h <= end_h) {
-          time_flag <- df$hour >= start_h & df$hour <= end_h
+        time_flag <- if (start_h <= end_h) {
+          df$hour >= start_h & df$hour <= end_h
         } else {
-          time_flag <- df$hour >= start_h | df$hour <= end_h
+          df$hour >= start_h | df$hour <= end_h
         }
-        time_violation <- as.integer(!time_flag)
+        time_violation <- rep(NA_integer_, nrow(df))
+        time_violation[detected] <- as.integer(!time_flag[detected])
       }
     }
 
@@ -111,7 +133,8 @@ check_spatio_temporal_plausibility <- function(predictions,
     sp_polys <- species_ranges[species_ranges$species_norm == sp_norm, ]
     if (nrow(sp_polys) == 0) {
       warning("Species '", sp, "' not found in species_ranges; marking range as violation")
-      range_violation <- rep(1L, nrow(df))
+      range_violation <- rep(NA_integer_, nrow(df))
+      range_violation[detected] <- 1L
     } else {
       within_mat <- sf::st_within(sf_points, sp_polys, sparse = FALSE)
       if (is.matrix(within_mat)) {
@@ -119,16 +142,18 @@ check_spatio_temporal_plausibility <- function(predictions,
       } else {
         range_flag <- as.logical(within_mat)
       }
-      range_violation <- as.integer(!range_flag)
+      range_violation <- rep(NA_integer_, nrow(df))
+      range_violation[detected] <- as.integer(!range_flag[detected])
     }
 
-    # assign flags
+    # --- Assign flags ---
     df[[paste0(sp, "_season_violation")]] <- season_violation
-    df[[paste0(sp, "_time_violation")]] <- time_violation
-    df[[paste0(sp, "_range_violation")]] <- range_violation
-    df[[paste0(sp, "_violation_score")]] <- season_violation + time_violation + range_violation
+    df[[paste0(sp, "_time_violation")]]   <- time_violation
+    df[[paste0(sp, "_range_violation")]]  <- range_violation
+    df[[paste0(sp, "_violation_score")]]  <- season_violation + time_violation + range_violation
   }
 
   rownames(df) <- NULL
   return(df)
 }
+

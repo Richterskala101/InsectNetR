@@ -1,12 +1,60 @@
 
+# Exemplary Workflow ------------------------------------------------------
+
+# 1. Load in Data usally in use
+
+# predictions
+data("predictions")
+
+# 2. apply thresholds
+tresholded_preds <- apply_thresholds(predictions, threshold = 0.5)
+
+# 3. apply spatio temporal checks
+
+# temporal species phenology
+data("temporal_species_phenology")
+temporal_species_phenology = temporal_species_phenology |>
+  dplyr::mutate(species = gsub(" ", ".", species))
+
+# species ranges
+ranges = get_gbif_ranges(species = c(colnames(predictions)[3:31]),
+                res = 50,
+                limit = 50,
+                region = "europe")
+
+# plot location coordinates
+plot_locations <- data.frame(
+  plot_id = c("AEG18RP", "AEG20RP"),
+  lat = c(51.1657, 50.9375),   # Approximate latitudes within Germany
+  lon = c(10.4515, 6.9603)    # Approximate longitudes within Germany
+)
+
+print(plot_locations)
+
+
+out = check_spatio_temporal_plausibility(
+  predictions = tresholded_preds,
+  species_info_temporal = temporal_species_phenology,
+  species_ranges = ranges,
+  plot_info = plot_locations)
+
+sampled_filenames <- predictions |>
+  dplyr::distinct(filename) |>
+  dplyr::slice_sample(n = 200)                   # Randomly select 200 filenames
+
+predictions <- predictions |>
+  dplyr::semi_join(sampled_filenames, by = "filename") |>
+  dplyr::filter(offset != "majority")
+
+use_data(predictions, overwrite = TRUE, compress = "xz")
+
 species_info_temporal <- temporal_species_phenology %>%
-  +     dplyr::transmute(
-    +         species = gsub(" ", ".", species),  # match wide column names
-    +         start_date = sprintf("%02d-01", season_start),  # month → MM-01
-    +         end_date   = sprintf("%02d-28", season_end),    # rough month end
-    +         start_hour = peak_activity_start,
-    +         end_hour   = peak_activity_end
-    +     )
+ dplyr::transmute(
+     species = gsub(" ", ".", species),  # match wide column names
+       start_date = sprintf("%02d-01", season_start),  # month → MM-01
+      end_date   = sprintf("%02d-28", season_end),    # rough month end
+      start_hour = peak_activity_start,
+     end_hour   = peak_activity_end)
 
 
 # take all species columns (assuming first two are metadata)

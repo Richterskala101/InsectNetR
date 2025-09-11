@@ -1,7 +1,7 @@
 #' Exemplary predictions of Orthoptera on audio recordings
 #'
 #'
-#' @format A data frame with 137968 rows and 31 columns:
+#' @format A data frame with 2951 rows and 31 columns:
 #' \describe{
 #'   \item{filename}{Relative file path to the original WAV audio recording (character).}
 #'   \item{offset}{Time segment of the audio file used for prediction, formatted as `"start-end"` in seconds (character).}
@@ -41,6 +41,8 @@
 #' # View the first few rows
 #' head(predictions)
 #'
+#' @docType data
+#' @name predictions
 "predictions"
 #' Confusable Orthoptera Species
 #'
@@ -75,6 +77,8 @@
 #'
 #' Roesti, C., & Keist, B. (2009). *Die Stimmen der Heuschrecken*. Bern: Haupt.
 #'
+#' @docType data
+#' @name confusable_species
 "confusable_species"
 #' Temporal Phenology and Stridulation Activity of Orthopteran Species
 #'
@@ -104,6 +108,8 @@
 #' Ragge, D. R., & Reynolds, W. J. (1998). *The songs of the grasshoppers and crickets of Western Europe*. Colchester: Brill.
 #'
 #' Roesti, C., & Keist, B. (2009). *Die Stimmen der Heuschrecken*. Bern: Haupt.
+#' @docType data
+#' @name temporal_species_phenology
 "temporal_species_phenology"
 #' Species-specific Thresholds (Dummy Data)
 #'
@@ -120,4 +126,6 @@
 #' @examples
 #' data(custom_thresholds)
 #' head(custom_thresholds)
+#' @docType data
+#' @name custom_thresholds
 "custom_thresholds"

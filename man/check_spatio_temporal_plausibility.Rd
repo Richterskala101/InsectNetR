@@ -2,7 +2,7 @@
 % Please edit documentation in R/check_spatio_temporal_plausibility.R
 \name{check_spatio_temporal_plausibility}
 \alias{check_spatio_temporal_plausibility}
-\title{Flag spatio-temporal plausibility}
+\title{Flag spatio-temporal violations (wide format, fully robust)}
 \usage{
 check_spatio_temporal_plausibility(
   predictions,
@@ -13,19 +13,31 @@ check_spatio_temporal_plausibility(
 )
 }
 \arguments{
-\item{predictions}{data.frame with columns: species, timestamp, plot_id}
+\item{predictions}{data.frame with at least \code{filename}, \code{offset}, and species columns (0/1).}
 
-\item{species_info_temporal}{data.frame with temporal info: species, start_date, end_date, start_hour, end_hour}
+\item{species_info_temporal}{data.frame with species temporal info:
+\code{genus} + \code{species} or \code{species} and \code{season_start}, \code{season_end}, \code{peak_activity_start}, \code{peak_activity_end}.}
 
-\item{species_ranges}{sf object with spatial ranges (polygons) and column \code{species}}
+\item{species_ranges}{sf object with polygons and a column \code{species}.}
 
-\item{plot_info}{data.frame with plot_id and coordinates: lat, lon}
+\item{plot_info}{data.frame with columns \code{plot_id}, \code{lat}, \code{lon}.}
 
-\item{tz}{time zone for time-of-day checks}
+\item{tz}{time zone for timestamps (default \code{"UTC"}).}
 }
 \value{
-original data with logical flag columns: season, time_of_day, range, and plausibility_score (sum of flags)
+A data.frame with original columns + violation flags per species:
+\verb{<species>_season_violation}, \verb{<species>_time_violation}, \verb{<species>_range_violation},
+\verb{<species>_violation_score}.
 }
 \description{
-Flag spatio-temporal plausibility
+Checks temporal (season / time-of-day) and spatial (range polygon) plausibility
+for presence/absence columns in a wide predictions table (like \code{bin_preds}),
+and directly flags violations.
+}
+\details{
+Violations are coded as:
+\itemize{
+\item 1 = problematic / implausible
+\item 0 = plausible / no issue
+}
 }
