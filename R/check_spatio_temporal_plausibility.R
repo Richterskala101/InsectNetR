@@ -21,11 +21,11 @@
 #' @export
 check_spatio_temporal_plausibility <- function(predictions,
                                                species_info_temporal,
-                                               species_ranges,
+                                               species_ranges,  # terra::SpatRaster only
                                                plot_info,
                                                tz = "UTC") {
-
   normalize <- function(x) tolower(gsub("[._ ]+", "_", as.character(x)))
+
   df <- as.data.frame(predictions, stringsAsFactors = FALSE)
   species_cols <- setdiff(colnames(df), c("filename", "offset"))
 
@@ -39,20 +39,36 @@ check_spatio_temporal_plausibility <- function(predictions,
   df$hour <- as.integer(lubridate::hour(lubridate::with_tz(df$timestamp, tzone = tz)))
   df$plot_id <- dirname(df$filename)
 
-  # Merge plot coordinates
-  df <- merge(df, plot_info, by = "plot_id", all.x = TRUE, sort = FALSE)
-
-  # If coordinates column is named "long", rename to "lon"
-  if (!"lon" %in% names(df) && "long" %in% names(df)) {
-    df$lon <- df$long
+  # --- Merge plot coordinates (robust, preserves order) ---
+  plot_info_df <- as.data.frame(plot_info, stringsAsFactors = FALSE)
+  if (!"lon" %in% names(plot_info_df) && "long" %in% names(plot_info_df)) {
+    plot_info_df$lon <- plot_info_df$long
   }
 
-  # Normalize species names in input tables
+  if (!"plot_id" %in% names(plot_info_df)) {
+    stop("plot_info must contain a 'plot_id' column")
+  }
+
+  # If lat/lon are missing in plot_info, fill with NA but continue
+  if (!"lat" %in% names(plot_info_df)) plot_info_df$lat <- NA_real_
+  if (!"lon" %in% names(plot_info_df)) plot_info_df$lon <- NA_real_
+
+  idx <- match(df$plot_id, plot_info_df$plot_id)
+  df$lat <- plot_info_df$lat[idx]
+  df$lon <- plot_info_df$lon[idx]
+
+  # Normalize species names in species_info_temporal
   si <- as.data.frame(species_info_temporal, stringsAsFactors = FALSE)
-  if (all(c("genus", "species") %in% names(si))) {
+  if ("species" %in% names(si)) {
+    if (any(grepl("\\.", si$species))) {
+      si$species_full <- si$species
+    } else if ("genus" %in% names(si)) {
+      si$species_full <- paste(si$genus, si$species)
+    } else {
+      stop("species_info_temporal must contain full species names or genus + species.")
+    }
+  } else if (all(c("genus", "species") %in% names(si))) {
     si$species_full <- paste(si$genus, si$species)
-  } else if ("species" %in% names(si)) {
-    si$species_full <- si$species
   } else {
     stop("species_info_temporal must contain either 'species' or both 'genus' and 'species'.")
   }
@@ -62,18 +78,18 @@ check_spatio_temporal_plausibility <- function(predictions,
   si$start_hour <- si$peak_activity_start
   si$end_hour <- si$peak_activity_end
 
-  species_ranges$species_norm <- normalize(species_ranges$species)
+  # Normalize species names in raster layers
+  raster_species_norm <- normalize(names(species_ranges))
 
-  # Convert to spatial points
-  old_s2 <- sf::sf_use_s2(FALSE)
-  on.exit(sf::sf_use_s2(old_s2), add = TRUE)
-  sf_points <- sf::st_as_sf(df, coords = c("lon", "lat"), crs = 4326, remove = FALSE)
+  # Prepare terra points from df coords
+  # (terra::vect tolerates NA coordinates; extract will return NA values)
+  pts_vect <- terra::vect(df[, c("lon", "lat")], geom = c("lon", "lat"), crs = "EPSG:4326")
 
   for (sp in species_cols) {
     sp_norm <- normalize(sp)
 
-    # --- Skip species not detected anywhere ---
-    detected <- df[[sp]] > 0
+    # Skip species not detected anywhere
+    detected <- !is.na(df[[sp]]) & df[[sp]] > 0
     if (!any(detected, na.rm = TRUE)) {
       df[[paste0(sp, "_season_violation")]] <- NA_integer_
       df[[paste0(sp, "_time_violation")]]   <- NA_integer_
@@ -82,25 +98,27 @@ check_spatio_temporal_plausibility <- function(predictions,
       next
     }
 
-    # --- season ---
+    # --- season and time violations ---
     si_idx <- match(sp_norm, si$species_norm)
-    if (length(si_idx) == 0 || is.na(si_idx)) {
+    if (is.na(si_idx)) {
       warning("Species '", sp, "' not found in temporal info; marking season/time as violation")
       season_violation <- rep(NA_integer_, nrow(df))
       season_violation[detected] <- 1L
       time_violation <- season_violation
     } else {
-      start_d <- si$start_date[si_idx]
-      end_d   <- si$end_date[si_idx]
-      if (length(start_d) == 0 || length(end_d) == 0 || is.na(start_d) || is.na(end_d)) {
-        warning("Species '", sp, "' missing start/end date; marking season as violation")
+      # Season check
+      start_m <- si$start_month[si_idx]
+      end_m <- si$end_month[si_idx]
+      if (is.na(start_m) || is.na(end_m)) {
+        warning("Species '", sp, "' missing start/end month; marking season as violation")
         season_violation <- rep(NA_integer_, nrow(df))
         season_violation[detected] <- 1L
       } else {
         season_flag <- vapply(df$date, FUN.VALUE = logical(1), FUN = function(d) {
           yr <- lubridate::year(d)
-          sd_full <- as.Date(paste0(yr, "-", start_d))
-          ed_full <- as.Date(paste0(yr, "-", end_d))
+          sd_full <- as.Date(paste0(yr, "-", sprintf("%02d", start_m), "-01"))
+          ed_full <- as.Date(paste0(yr, "-", sprintf("%02d", end_m), "-01")) +
+            lubridate::days(lubridate::days_in_month(as.Date(paste0(yr, "-", sprintf("%02d", end_m), "-01")))) - 1
           if (sd_full <= ed_full) {
             d >= sd_full & d <= ed_full
           } else {
@@ -111,10 +129,10 @@ check_spatio_temporal_plausibility <- function(predictions,
         season_violation[detected] <- as.integer(!season_flag[detected])
       }
 
-      # --- time ---
+      # Time check
       start_h <- si$start_hour[si_idx]
-      end_h   <- si$end_hour[si_idx]
-      if (length(start_h) == 0 || length(end_h) == 0 || is.na(start_h) || is.na(end_h)) {
+      end_h <- si$end_hour[si_idx]
+      if (is.na(start_h) || is.na(end_h)) {
         warning("Species '", sp, "' missing start/end hour; marking time as violation")
         time_violation <- rep(NA_integer_, nrow(df))
         time_violation[detected] <- 1L
@@ -129,31 +147,40 @@ check_spatio_temporal_plausibility <- function(predictions,
       }
     }
 
-    # --- Range violation ---
-    sp_polys <- species_ranges[species_ranges$species_norm == sp_norm, ]
-    if (nrow(sp_polys) == 0) {
-      warning("Species '", sp, "' not found in species_ranges; marking range as violation")
+    # --- Range violation using raster (robust) ---
+    layer_idx <- match(sp_norm, raster_species_norm)
+    if (is.na(layer_idx)) {
+      warning("Species '", sp, "' not found in species_ranges raster layers; marking range as violation")
       range_violation <- rep(NA_integer_, nrow(df))
       range_violation[detected] <- 1L
     } else {
-      within_mat <- sf::st_within(sf_points, sp_polys, sparse = FALSE)
-      if (is.matrix(within_mat)) {
-        range_flag <- rowSums(within_mat, na.rm = TRUE) > 0
+      ex <- terra::extract(species_ranges[[layer_idx]], pts_vect)
+      # 'ex' is typically a data.frame with ID (col1) and values (col2)
+      if (is.data.frame(ex) || is.matrix(ex)) {
+        vals <- ex[, ncol(ex)]
       } else {
-        range_flag <- as.logical(within_mat)
+        vals <- as.vector(ex)
       }
-      range_violation <- rep(NA_integer_, nrow(df))
-      range_violation[detected] <- as.integer(!range_flag[detected])
+
+      # compute violation only for detected presences; leave others as NA
+      range_violation <- ifelse(!is.na(df[[sp]]) & df[[sp]] > 0,
+                                as.integer(is.na(vals) | vals != 1),
+                                NA_integer_)
     }
 
-    # --- Assign flags ---
+    # --- Assign flags and score ---
     df[[paste0(sp, "_season_violation")]] <- season_violation
     df[[paste0(sp, "_time_violation")]]   <- time_violation
     df[[paste0(sp, "_range_violation")]]  <- range_violation
-    df[[paste0(sp, "_violation_score")]]  <- season_violation + time_violation + range_violation
+
+    # Violation score: sum of available flags; if all three NA -> NA
+    any_flag_present <- !(is.na(season_violation) & is.na(time_violation) & is.na(range_violation))
+    score_vals <- (ifelse(is.na(season_violation), 0L, season_violation) +
+                     ifelse(is.na(time_violation), 0L, time_violation) +
+                     ifelse(is.na(range_violation), 0L, range_violation))
+    df[[paste0(sp, "_violation_score")]] <- ifelse(any_flag_present, score_vals, NA_integer_)
   }
 
   rownames(df) <- NULL
   return(df)
 }
-

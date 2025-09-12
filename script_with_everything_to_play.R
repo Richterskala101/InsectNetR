@@ -13,38 +13,29 @@ tresholded_preds <- apply_thresholds(predictions, threshold = 0.5)
 
 # temporal species phenology
 data("temporal_species_phenology")
-temporal_species_phenology = temporal_species_phenology |>
-  dplyr::mutate(species = gsub(" ", ".", species))
 
 # species ranges
-ranges = get_gbif_ranges(species = c(colnames(predictions)[3:31]),
+ranges = get_gbif_ranges(species = c(colnames(predictions)[3:7]),
                 res = 50,
-                limit = 50,
+                limit = 100,
                 region = "europe")
 
-# plot location coordinates
-plot_locations <- data.frame(
+plot(ranges)
+
+# plot info
+plot_info <- data.frame(
   plot_id = c("AEG18RP", "AEG20RP"),
-  lat = c(51.1657, 50.9375),   # Approximate latitudes within Germany
-  lon = c(10.4515, 6.9603)    # Approximate longitudes within Germany
-)
-
-print(plot_locations)
-
+  lat = c(53.55, 48.13),   # approx. Hamburg and Munich
+  lon = c(10.00, 11.58))
 
 out = check_spatio_temporal_plausibility(
   predictions = tresholded_preds,
   species_info_temporal = temporal_species_phenology,
   species_ranges = ranges,
-  plot_info = plot_locations)
+  plot_info = plot_info)
 
-sampled_filenames <- predictions |>
-  dplyr::distinct(filename) |>
-  dplyr::slice_sample(n = 200)                   # Randomly select 200 filenames
 
-predictions <- predictions |>
-  dplyr::semi_join(sampled_filenames, by = "filename") |>
-  dplyr::filter(offset != "majority")
+
 
 use_data(predictions, overwrite = TRUE, compress = "xz")
 
@@ -72,7 +63,7 @@ custom_thresholds <- data.frame(
 head(custom_thresholds)
 
 # save it into your package
-usethis::use_data(custom_thresholds, overwrite = TRUE, compress = "xz")
+usethis::use_data(temporal_species_phenology, overwrite = TRUE, compress = "xz")
 
 
 library(openxlsx)

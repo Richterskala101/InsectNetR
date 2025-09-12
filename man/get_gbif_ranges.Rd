@@ -2,25 +2,23 @@
 % Please edit documentation in R/get_gbif_ranges.R
 \name{get_gbif_ranges}
 \alias{get_gbif_ranges}
-\title{Build GBIF-based species ranges at ~10 km resolution
-#' Build GBIF-based species ranges at ~10 km resolution
-Retrieves occurrence data from GBIF via \pkg{rgbif} and aggregates them
-into a gridded species range map at the specified resolution.}
+\title{Build GBIF-based species ranges at selected resolution}
 \usage{
 get_gbif_ranges(
   species,
   res = 10,
-  limit = 20000,
+  limit = 200,
   region = "world",
   collect_citations = FALSE
 )
 }
 \arguments{
-\item{species}{Character vector of species names, or a column from a data.frame.}
+\item{species}{Character vector of species names, or a column from a data.frame. Can either be formated like
+c("Bicolorana bicolor", "Chorthippus albomarginatus") or c("Bicolorana.bicolor","Chorthippus.albomarginatus") to match with model output nomeclature.}
 
 \item{res}{Numeric. Grid resolution in kilometers. Default is 10.}
 
-\item{limit}{Integer. Maximum number of GBIF records per species. Default is 20000.}
+\item{limit}{Integer. Maximum number of GBIF records per species. Default is 200.}
 
 \item{region}{Character. One of "world", "europe", "asia", "americas".
 Defines the bounding box used for the GBIF query. Default is "world".}
@@ -29,23 +27,31 @@ Defines the bounding box used for the GBIF query. Default is "world".}
 and attached as an attribute of the returned sf object.}
 }
 \value{
-An \code{sf} polygon object with a column \code{species}. If \code{collect_citations=TRUE},
+An \code{terra} raster stack object with a \code{species} occurence raster stacked. If \code{collect_citations=TRUE},
 a \code{citations} attribute is attached (data.frame with datasetKey, title, citation).
 }
 \description{
-The result is an \code{sf} polygon object suitable for spatial plausibility checks.
+Retrieves occurrence data from GBIF via \pkg{rgbif} and aggregates them
+into a gridded species range map at the specified resolution.
+}
+\details{
+The result is an \code{terra} raster stack suitable for spatial plausibility checks.
 A citation for the used datsets can also be exported. Please cite the data accordingly.
 }
 \examples{
 \dontrun{
-library(sf)
 sp_vec <- c("Tettigonia viridissima", "Barbitistes serricauda")
 
 # Retrieve ranges for Europe only
-ranges_eu <- get_gbif_ranges(sp_vec, res = 10, region = "europe", return_citation = TRUE)
+ranges_eu <- get_gbif_ranges(
+  species = species_vec,
+  res = 50,
+  limit = 100,
+  region = "europe",
+  collect_citations = TRUE)
 
 # Plot result
-plot(st_geometry(ranges_eu), col = "lightblue", border = "darkblue")
+plot(ranges_eu)
 
 # plot citations
 

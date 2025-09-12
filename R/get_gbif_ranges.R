@@ -1,12 +1,13 @@
-#' Build GBIF-based species ranges at ~10 km resolution
-#'#' Build GBIF-based species ranges at ~10 km resolution
+#' Build GBIF-based species ranges at selected resolution
+#'
 #' Retrieves occurrence data from GBIF via \pkg{rgbif} and aggregates them
 #' into a gridded species range map at the specified resolution.
 #'
-#' The result is an `sf` polygon object suitable for spatial plausibility checks.
+#' The result is an `terra` raster stack suitable for spatial plausibility checks.
 #' A citation for the used datsets can also be exported. Please cite the data accordingly.
 #'
-#' @param species Character vector of species names, or a column from a data.frame.
+#' @param species Character vector of species names, or a column from a data.frame. Can either be formated like
+#' c("Bicolorana bicolor", "Chorthippus albomarginatus") or c("Bicolorana.bicolor","Chorthippus.albomarginatus") to match with model output nomeclature.
 #' @param res Numeric. Grid resolution in kilometers. Default is 10.
 #' @param limit Integer. Maximum number of GBIF records per species. Default is 200.
 #' @param region Character. One of "world", "europe", "asia", "americas".
@@ -14,19 +15,23 @@
 #' @param collect_citations Logical. If TRUE, dataset citations are retrieved
 #'   and attached as an attribute of the returned sf object.
 #'
-#' @return An `sf` polygon object with a column `species`. If `collect_citations=TRUE`,
+#' @return An `terra` raster stack object with a `species` occurence raster stacked. If `collect_citations=TRUE`,
 #'   a `citations` attribute is attached (data.frame with datasetKey, title, citation).
 #'
 #' @examples
 #' \dontrun{
-#' library(sf)
 #' sp_vec <- c("Tettigonia viridissima", "Barbitistes serricauda")
 #'
 #' # Retrieve ranges for Europe only
-#' ranges_eu <- get_gbif_ranges(sp_vec, res = 10, region = "europe", return_citation = TRUE)
+#' ranges_eu <- get_gbif_ranges(
+#'   species = species_vec,
+#'   res = 50,
+#'   limit = 100,
+#'   region = "europe",
+#'   collect_citations = TRUE)
 #'
 #' # Plot result
-#' plot(st_geometry(ranges_eu), col = "lightblue", border = "darkblue")
+#' plot(ranges_eu)
 #'
 #' # plot citations
 #'
@@ -34,127 +39,116 @@
 #'
 #' @export
 get_gbif_ranges <- function(species,
-                                  res = 10,
-                                  limit = 200,
-                                  region = "world",
-                                  collect_citations = FALSE) {
-  if (is.data.frame(species)) {
-    stop("Please pass a character vector, not a data.frame. Use df$species_col instead.")
-  }
-  species <- unique(as.character(species))
+                                    res = 10,
+                                    limit = 200,
+                                    region = "world",
+                                    collect_citations = FALSE) {
 
-  # --- Region bounding boxes ---
-  region_bbox <- list(
-    world    = sf::st_bbox(c(xmin = -180, ymin = -90, xmax = 180, ymax = 90), crs = 4326),
-    europe   = sf::st_bbox(c(xmin = -31, ymin = 34, xmax = 40, ymax = 72), crs = 4326),
-    asia     = sf::st_bbox(c(xmin = 26, ymin = -10, xmax = 180, ymax = 81), crs = 4326),
-    americas = sf::st_bbox(c(xmin = -170, ymin = -60, xmax = -25, ymax = 83), crs = 4326)
+  region_bboxes <- list(
+    world = c(-180, 180, -90, 90),
+    europe = c(-25, 45, 34, 72),
+    asia = c(25, 180, -10, 80),
+    americas = c(-130, -30, -60, 75)
   )
-  if (!region %in% names(region_bbox)) {
-    stop("Unknown region. Use one of: ", paste(names(region_bbox), collapse = ", "))
+
+  if (!region %in% names(region_bboxes)) {
+    stop("Invalid region. Choose one of: ", paste(names(region_bboxes), collapse = ", "))
   }
-  wkt_region <- sf::st_as_text(sf::st_as_sfc(region_bbox[[region]]))
 
-  ranges_list <- list()
-  dataset_keys <- character()
+  bbox <- region_bboxes[[region]]
 
-  for (sp in species) {
-    message("Processing species: ", sp, " in region: ", region)
+  deg_res <- res / 111
+  base_raster <- terra::rast(
+    res = deg_res,
+    extent = terra::ext(bbox[1], bbox[2], bbox[3], bbox[4]),
+    crs = "EPSG:4326"
+  )
+  # After species input processing:
 
-    # 1. Taxon key
-    key <- tryCatch({
-      out <- rgbif::name_backbone(name = sp, rank = "species")
-      out$usageKey
-    }, error = function(e) NA)
-    if (is.na(key)) {
-      warning("No GBIF key for ", sp)
-      next
-    }
+  if (is.data.frame(species)) {
+    if (ncol(species) != 1) stop("If species is a data.frame, it must be a single column")
+    species <- species[[1]]
+  }
 
-    # 2. Occurrences
-    occ <- tryCatch({
+  # Replace dots with spaces (e.g. "Bicolorana.bicolor" -> "Bicolorana bicolor")
+  species <- gsub("\\.", " ", species)
+
+  species <- unique(species)
+  species <- species[!is.na(species)]
+  process_one_species <- function(species_name) {
+    message("Processing species: ", species_name)
+
+    gbif_data <- tryCatch(
       rgbif::occ_search(
-        taxonKey = key,
+        scientificName = species_name,
         hasCoordinate = TRUE,
-        geometry = wkt_region,
         limit = limit,
-        fields = c("decimalLatitude", "decimalLongitude", "datasetKey")
-      )$data
-    }, error = function(e) NULL)
+        decimalLongitude = paste0(bbox[1], ",", bbox[2]),
+        decimalLatitude = paste0(bbox[3], ",", bbox[4])
+      ),
+      error = function(e) {
+        warning("Failed to download GBIF data for ", species_name, ": ", e$message)
+        return(NULL)
+      }
+    )
 
-    if (is.null(occ) || nrow(occ) == 0) next
-
-    # 🧼 Clean missing coordinates
-    occ <- occ[!is.na(occ$decimalLatitude) & !is.na(occ$decimalLongitude), ]
-    if (nrow(occ) == 0) next  # skip if nothing left after cleaning
-    dataset_keys <- c(dataset_keys, unique(occ$datasetKey))
-
-    # 3. sf conversion
-    # 3. sf conversion
-    occ <- occ[!is.na(occ$decimalLatitude) & !is.na(occ$decimalLongitude), ]
-    if (nrow(occ) == 0) {
-      warning("All coordinates missing for ", sp)
-      next
+    if (is.null(gbif_data) || nrow(gbif_data$data) == 0) {
+      message("No occurrence data found for ", species_name)
+      return(NULL)
     }
 
-    pts <- tryCatch({
-      sf::st_as_sf(occ,
-                   coords = c("decimalLongitude", "decimalLatitude"),
-                   crs = 4326, remove = FALSE)
-    }, error = function(e) {
-      warning("Failed to convert to sf for ", sp)
-      return(NULL)
-    })
-    if (is.null(pts)) next
-
-    pts_proj <- tryCatch({
-      sf::st_transform(pts, 6933) # Equal Area projection
-    }, error = function(e) {
-      warning("Projection failed for ", sp)
-      return(NULL)
-    })
-    if (is.null(pts_proj) || nrow(pts_proj) == 0 || all(sf::st_is_empty(pts_proj))) {
-      warning("No valid projected points for ", sp)
-      next
+    if (collect_citations) {
+      citations <- tryCatch(
+        rgbif::derived_dataset(species_name),
+        error = function(e) NULL
+      )
     }
 
-    grid <- tryCatch({
-      sf::st_make_grid(pts_proj, cellsize = res * 1000, square = TRUE)
-    }, error = function(e) {
-      warning("Grid creation failed for ", sp)
+    # Remove rows with missing coords
+    occ_df <- gbif_data$data[!is.na(gbif_data$data$decimalLongitude) & !is.na(gbif_data$data$decimalLatitude), ]
+    if (nrow(occ_df) == 0) {
+      message("No valid coordinates for ", species_name)
       return(NULL)
-    })
-    if (is.null(grid)) next
+    }
 
-    grid_sf <- sf::st_sf(geometry = grid)
-    grid_sel <- grid_sf[lengths(sf::st_intersects(grid_sf, pts_proj)) > 0, ]
+    # Create SpatVector directly from data.frame coords
+    occ_vect <- terra::vect(occ_df, geom = c("decimalLongitude", "decimalLatitude"), crs = "EPSG:4326")
 
-    grid_sel <- sf::st_transform(grid_sel, 4326)
-    grid_sel$species <- sp
+    raster_layer <- terra::rasterize(occ_vect, base_raster, field = 1, fun = "sum", background = 0)
+    raster_layer[raster_layer > 0] <- 1
+    names(raster_layer) <- make.names(species_name)
 
-    ranges_list[[sp]] <- grid_sel
+    if (collect_citations && exists("citations")) {
+      attr(raster_layer, "citations") <- citations
+    }
+
+    return(raster_layer)
   }
 
-  if (length(ranges_list) == 0) {
-    stop("No valid ranges produced.")
+  if (is.data.frame(species)) {
+    if (ncol(species) != 1) stop("If species is a data.frame, it must be a single column")
+    species <- species[[1]]
   }
 
-  ranges_all <- do.call(rbind, ranges_list)
+  species <- unique(species)
+  species <- species[!is.na(species)]
 
-  # --- Collect citations if requested ---
-  if (collect_citations && length(dataset_keys) > 0) {
-    dataset_keys <- unique(dataset_keys)
-    citations <- lapply(dataset_keys, function(k) {
-      cit <- tryCatch(rgbif::dataset_get(k), error = function(e) NULL)
-      if (is.null(cit)) return(NULL)
-      data.frame(datasetKey = k,
-                 title = cit$title %||% NA_character_,
-                 citation = cit$citation$text %||% NA_character_,
-                 stringsAsFactors = FALSE)
-    })
-    citations <- do.call(rbind, citations)
-    attr(ranges_all, "citations") <- citations
+  raster_list <- lapply(species, process_one_species)
+  raster_list <- Filter(Negate(is.null), raster_list)
+
+  if (length(raster_list) == 0) {
+    stop("No valid raster layers generated. Check species names and GBIF availability.")
   }
 
-  return(ranges_all)
+  species_stack <- terra::rast(raster_list)
+
+  if (collect_citations) {
+    all_citations <- lapply(raster_list, function(x) attr(x, "citations"))
+    all_citations <- Filter(Negate(is.null), all_citations)
+    if (length(all_citations)) {
+      attr(species_stack, "citations") <- all_citations
+    }
+  }
+
+  return(species_stack)
 }
