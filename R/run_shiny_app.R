@@ -227,13 +227,7 @@ run_shiny_app <- function() {
      state$www_files[state$index]  # browser path for playback
     })
 
-    shiny::observeEvent(input$correct, { save_outcome(1)() })
-    shiny::observeEvent(input$incorrect, { save_outcome(0)() })
-    shiny::observeEvent(input$skip, advance())
-    shiny::observeEvent(input$prev, {
-      state$index <- max(1, state$index - 1)
-    })
-
+    
     # ----------------------------------------------------------------------
     # 1️⃣  Helper that moves to the next clip (used by both skip and save)
     # ----------------------------------------------------------------------
