@@ -234,49 +234,56 @@ run_shiny_app <- function() {
       state$index <- max(1, state$index - 1)
     })
 
-    save_outcome <- function(outcome_val) {
-      function(...) {
-        file <- basename(current_file())
-        parts <- strsplit(file, "_")[[1]]
-        score <- as.numeric(gsub(".wav", "", parts[length(parts)]))
-        new_entry <- data.frame(
-          file = file,
-          score = score,
-          class = input$class,
-          outcome = outcome_val
-        )
-        state$data <- dplyr::bind_rows(state$data, new_entry)
-
-        if (!is.null(save_path())) {
-          utils::write.csv(state$data, save_path(), row.names = FALSE)
-        }
-
-        advance()
-      }
-    }
-
+    # ----------------------------------------------------------------------
+    # 1️⃣  Helper that moves to the next clip (used by both skip and save)
+    # ----------------------------------------------------------------------
     advance <- function() {
       if (state$index < length(state$abs_files)) {
         state$index <- state$index + 1
       } else {
         shiny::showNotification("You have reached the last clip.", type = "message")
       }
+      # reset zoom when we jump to a new clip
+      state$zoom_time <- NULL
+      state$zoom_freq <- NULL
     }
-
-    output$clip_info <- shiny::renderPrint({
-      paste("Clip:", basename(current_file()),
-            "[", state$index, "/", length(state$abs_files), "]")
-    })
-
-    output$audio_ui <- shiny::renderUI({
-    shiny::req(current_file_www())
-    shiny::tags$audio(
-       id = "audio",
-       src = current_file_www(),
-       type = "audio/wav",
-       controls = NA
+    
+    # ----------------------------------------------------------------------
+    # 2️⃣  Save annotation and then call `advance()`
+    # ----------------------------------------------------------------------
+    save_outcome <- function(outcome_val) {
+      shiny::req(state$abs_files, state$index, input$class)
+      
+      # ---- extract the score from the file name ----------------------------
+      file   <- basename(current_file())
+      parts  <- strsplit(file, "_")[[1]]
+      score  <- as.numeric(gsub("\\.wav$", "", parts[length(parts)]))
+      
+      # ---- add row to data ------------------------------------------------
+      new_entry <- data.frame(
+        file    = file,
+        score   = score,
+        class   = input$class,
+        outcome = outcome_val,
+        stringsAsFactors = FALSE
       )
-    })
+      state$data <- dplyr::bind_rows(state$data, new_entry)
+      
+      # ---- optional disk write --------------------------------------------
+      if (!is.null(save_path())) {
+        utils::write.csv(state$data, save_path(), row.names = FALSE)
+      }
+      
+      # ---- move on --------------------------------------------------------
+      advance()
+    }
+    
+    # ----------------------------------------------------------------------
+    # 3️⃣  Wire the three buttons
+    # ----------------------------------------------------------------------
+    shiny::observeEvent(input$correct,   { save_outcome(1) })
+    shiny::observeEvent(input$incorrect, { save_outcome(0) })
+    shiny::observeEvent(input$skip,      { advance() })
 
 
     # Zoom logic
