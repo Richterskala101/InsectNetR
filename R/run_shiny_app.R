@@ -256,7 +256,7 @@ run_shiny_app <- function() {
     }
 
     advance <- function() {
-      if (state$index < length(state$files)) {
+      if (state$index < length(state$abs_files)) {
         state$index <- state$index + 1
       } else {
         shiny::showNotification("You have reached the last clip.", type = "message")
@@ -265,7 +265,7 @@ run_shiny_app <- function() {
 
     output$clip_info <- shiny::renderPrint({
       paste("Clip:", basename(current_file()),
-            "[", state$index, "/", length(state$files), "]")
+            "[", state$index, "/", length(state$abs_files), "]")
     })
 
     output$audio_ui <- shiny::renderUI({
