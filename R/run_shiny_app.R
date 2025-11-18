@@ -118,6 +118,8 @@ run_shiny_app <- function() {
   )
 
   # ==== SERVER ====
+  shiny::addResourcePath("segments", "www/segments")
+
   server <- function(input, output, session) {
     volumes <- c(Home = fs::path_home(), "B:" = "B:/", "C:" = "C:/", "D:" = "D:/")
     shinyFiles::shinyDirChoose(input, "segment_dir_btn", roots = volumes, session = session)
@@ -205,13 +207,20 @@ run_shiny_app <- function() {
         }
       }
 
-      state$files <- file.path("www", "segments", class_name, basename(files))
+      # Store absolute and www paths separately
+      state$abs_files <- files
+      state$www_files <- file.path("segments", class_name, basename(files))
       state$index <- 1
+
     })
 
     current_file <- shiny::reactive({
-      shiny::req(state$files)
-      state$files[state$index]
+     state$abs_files[state$index]  # real path for spectrogram
+    })
+
+    current_file_www <- shiny::reactive({
+     state$www_files[state$index]  # browser path for playback
+    })
     })
 
     shiny::observeEvent(input$correct, { save_outcome(1)() })
@@ -256,10 +265,15 @@ run_shiny_app <- function() {
     })
 
     output$audio_ui <- shiny::renderUI({
-      shiny::req(current_file())
-      rel_path <- sub("^www/", "", current_file())
-      shiny::tags$audio(id = "audio", src = rel_path, type = "audio/wav", controls = NA)
+    shiny::req(current_file_www())
+    shiny::tags$audio(
+       id = "audio",
+       src = current_file_www(),
+       type = "audio/wav",
+       controls = NA
+      )
     })
+
 
     # Zoom logic
     shiny::observeEvent(input$spec_brush, {
