@@ -118,9 +118,14 @@ run_shiny_app <- function() {
   )
 
   # ==== SERVER ====
-  shiny::addResourcePath("segments", "www/segments")
 
   server <- function(input, output, session) {
+    # Ensure folder exists before registering it
+    if (!dir.exists("www/segments")) {
+      dir.create("www/segments", recursive = TRUE)
+    }
+    
+    shiny::addResourcePath("segments", "www/segments")
     volumes <- c(Home = fs::path_home(), "B:" = "B:/", "C:" = "C:/", "D:" = "D:/")
     shinyFiles::shinyDirChoose(input, "segment_dir_btn", roots = volumes, session = session)
     shinyFiles::shinyDirChoose(input, "save_dir_btn", roots = volumes, session = session)
