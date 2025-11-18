@@ -221,7 +221,6 @@ run_shiny_app <- function() {
     current_file_www <- shiny::reactive({
      state$www_files[state$index]  # browser path for playback
     })
-    })
 
     shiny::observeEvent(input$correct, { save_outcome(1)() })
     shiny::observeEvent(input$incorrect, { save_outcome(0)() })
