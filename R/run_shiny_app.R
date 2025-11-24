@@ -206,32 +206,51 @@ run_shiny_app <- function() {
 
     # go to Review tab -------------------------------------------------
     shiny::observeEvent(input$proceed, {
-      shiny::updateTabsetPanel(session, "main_tabs",
-                               selected = "2. Review")
+
+      shiny::req(save_path())
+
+      # Case 1 — file exists and overwrite not confirmed
+      if (file.exists(save_path()) && !state$overwrite_ok) {
+
+        shiny::showModal(
+          shiny::modalDialog(
+            title = "Overwrite Existing File?",
+            paste("A results file already exists at:", save_path()),
+            "Do you want to overwrite it?",
+            easyClose = FALSE,
+            footer = tagList(
+              shiny::modalButton("Cancel"),
+              shiny::actionButton("confirm_overwrite", "Overwrite", class = "btn-danger")
+            )
+          )
+        )
+
+      } else {
+
+        # Case 2 — file does not exist → allow writing
+        if (!file.exists(save_path())) {
+          state$overwrite_ok <- TRUE
+        }
+
+        shiny::updateTabsetPanel(session, "main_tabs", selected = "2. Review")
+      }
+    })
+
+    shiny::observeEvent(input$confirm_overwrite, {
+      state$overwrite_ok <- TRUE
+      shiny::removeModal()
+      shiny::updateTabsetPanel(session, "main_tabs", selected = "2. Review")
     })
 
     #----------------------- 2. Reactive state -----------------------
     state <- shiny::reactiveValues(
-      # files for the currently selected class
-      files_abs = NULL,   # absolute paths on disk (spectrogram)
-      files_www = NULL,   # web‑accessible paths (audio tag)
-      index     = 1,
-
-      # stored annotations
-      data      = data.frame(
-        file    = character(),
-        score   = numeric(),
-        class   = character(),
-        outcome = integer(),
-        stringsAsFactors = FALSE
-      ),
-
-      # list of class names (sub‑folders)
-      classes   = character(),
-
-      # zoom extents for the spectrogram
+      files = NULL,
+      index = 1,
+      data = data.frame(file = character(), score = numeric(), class = character(), outcome = integer()),
+      classes = character(),
       zoom_time = NULL,
-      zoom_freq = NULL
+      zoom_freq = NULL,
+      overwrite_ok = FALSE     # <-- NEW FLAG
     )
 
     #----------------------- 3. Load classes -------------------------
@@ -324,9 +343,8 @@ run_shiny_app <- function() {
       state$data <- dplyr::bind_rows(state$data, new_row)
 
       # ---- write to CSV (optional, but nice) -------------------
-      if (!is.null(save_path())) {
-        utils::write.csv(state$data, save_path(),
-                         row.names = FALSE)
+      if (!is.null(save_path()) && state$overwrite_ok) {
+        utils::write.csv(state$data, save_path(), row.names = FALSE)
       }
 
       # ---- move to next clip -----------------------------------
