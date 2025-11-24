@@ -119,7 +119,9 @@ run_shiny_app <- function() {
 
   # ==== SERVER ====
   server <- function(input, output, session) {
-    volumes <- c(Home = fs::path_home(), "B:" = "B:/", "C:" = "C:/", "D:" = "D:/")
+    all_drives <- paste0(LETTERS[1:26], ":/")
+    existing_drives <- all_drives[file.exists(all_drives)]
+    volumes <- c(Home = fs::path_home(), setNames(existing_drives, existing_drives))
     shinyFiles::shinyDirChoose(input, "segment_dir_btn", roots = volumes, session = session)
     shinyFiles::shinyDirChoose(input, "save_dir_btn", roots = volumes, session = session)
 
@@ -158,6 +160,38 @@ run_shiny_app <- function() {
     })
 
     shiny::observeEvent(input$proceed, {
+      shiny::req(save_path())
+
+      # Case 1 — file exists and overwrite not confirmed
+      if (file.exists(save_path()) && !state$overwrite_ok) {
+
+        shiny::showModal(
+          shiny::modalDialog(
+            title = "Overwrite Existing File?",
+            paste("A results file already exists at:", save_path()),
+            "Do you want to overwrite it?",
+            easyClose = FALSE,
+            footer = tagList(
+              shiny::modalButton("Cancel"),
+              shiny::actionButton("confirm_overwrite", "Overwrite", class = "btn-danger")
+            )
+          )
+        )
+
+      } else {
+
+        # Case 2 — file does not exist → allow writing
+        if (!file.exists(save_path())) {
+          state$overwrite_ok <- TRUE
+        }
+
+        shiny::updateTabsetPanel(session, "main_tabs", selected = "2. Review")
+      }
+    })
+
+    shiny::observeEvent(input$confirm_overwrite, {
+      state$overwrite_ok <- TRUE
+      shiny::removeModal()
       shiny::updateTabsetPanel(session, "main_tabs", selected = "2. Review")
     })
 
@@ -167,7 +201,8 @@ run_shiny_app <- function() {
       data = data.frame(file = character(), score = numeric(), class = character(), outcome = integer()),
       classes = character(),
       zoom_time = NULL,
-      zoom_freq = NULL
+      zoom_freq = NULL,
+      overwrite_ok = FALSE     # <-- NEW FLAG
     )
 
     # Load classes
@@ -234,7 +269,7 @@ run_shiny_app <- function() {
         )
         state$data <- dplyr::bind_rows(state$data, new_entry)
 
-        if (!is.null(save_path())) {
+        if (!is.null(save_path()) && state$overwrite_ok) {
           utils::write.csv(state$data, save_path(), row.names = FALSE)
         }
 
