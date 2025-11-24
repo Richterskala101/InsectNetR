@@ -101,6 +101,30 @@ Secondly, start annotating by pressing: "Load segment classes"
 
 ![thats how it should look like](Images_for_illustration/App_Picture.JPG)
 
+### Buttons
+
+You are now able to view the spectrogram and play the sounds of the segments.
+Whith the correct/incorrect button, you can register wether the suggested species or sound category is on the segment or not. Your records will be saved automatically in the resulting csv file (default is "results.csv", but the user can choose another name in the folder-selection tab).
+
+### Spectrogram Viewer
+
+The spectrogram displays the frequency content of each audio segment over time. Darker or brighter areas represent stronger acoustic energy at those frequencies.
+
+**Zooming and Navigation**
+
+- Click and drag on the spectrogram to zoom into a time–frequency region.
+- Double-click anywhere to return to the full view.
+- You can repeatedly zoom to inspect fine details of short signals.
+
+**Spectrogram Settings**
+
+Several parameters allow you to adjust how the spectrogram is rendered:
+
+- FFT Window Length — controls the time–frequency resolution trade-off. Larger windows increase frequency resolution; smaller windows improve temporal detail.
+- Overlap: percentage of overlap between analysis windows. Higher values produce smoother spectrograms.
+- Max Frequency: sets the highest frequency displayed (in kHz), useful for focusing on insect or bird frequency ranges.
+- Dark Mode: switches between light and dark visual themes for the spectrogram.
+
 ## Additional Notes
 
 * The app will automatically recognize available class subfolders.
