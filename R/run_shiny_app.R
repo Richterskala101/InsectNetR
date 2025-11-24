@@ -163,12 +163,9 @@ run_shiny_app <- function() {
     shiny::addResourcePath("segments", "www/segments")
 
     # roots for shinyFiles (you can add/remove drives as you like)
-    volumes <- c(
-      Home = fs::path_home(),
-      "B:" = "B:/",
-      "C:" = "C:/",
-      "D:" = "D:/"
-    )
+    all_drives <- paste0(LETTERS[1:26], ":/")
+    existing_drives <- all_drives[file.exists(all_drives)]
+    volumes <- c(Home = fs::path_home(), setNames(existing_drives, existing_drives))
     shinyFiles::shinyDirChoose(input, "segment_dir_btn",
                                roots = volumes, session = session)
     shinyFiles::shinyDirChoose(input, "save_dir_btn",
